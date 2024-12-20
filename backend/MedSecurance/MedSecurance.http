@@ -1,0 +1,7 @@
+@MedSecurance_HostAddress = http://localhost:5287
+
+GET {{MedSecurance_HostAddress}}/devices/
+Accept: application/json
+
+
+###

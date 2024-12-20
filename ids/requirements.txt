@@ -1,0 +1,10 @@
+pandas
+dpkt
+pyspark
+tqdm
+scikit-learn
+scapy
+matplotlib
+streamlit
+python-dotenv
+requests

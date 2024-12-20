@@ -1,0 +1,72 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Security Alert</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }}
+        .container {{
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }}
+        .header {{
+            text-align: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e4e4e4;
+        }}
+        .header h1 {{
+            margin: 0;
+            font-size: 24px;
+            color: #d9534f;
+        }}
+        .content {{
+            padding: 20px 0;
+        }}
+        .content p {{
+            margin: 0 0 10px;
+            line-height: 1.6;
+        }}
+        .footer {{
+            text-align: center;
+            padding: 10px 0;
+            border-top: 1px solid #e4e4e4;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #999;
+        }}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Account Security Alert</h1>
+    </div>
+    <div class="content">
+        <p>Hello,</p>
+        <p>We noticed that there have been <strong>{0} failed login attempts</strong> on your account. For your security, please ensure that it was you trying to log in.</p>
+        <p>If you did not attempt to log in, we recommend that you reset your password immediately to protect your account.</p>
+<!--        <p>To reset your password, please follow the link below:</p>-->
+<!--        <p><a href="[Reset Password Link]" style="color: #d9534f;">Reset Password</a></p>-->
+        <p>If you have any questions or need further assistance, please contact the support team.</p>
+        <p>Thank you for your attention to this matter.</p>
+        <p>Best regards,</p>
+        <p>MedSecurance Team</p>
+    </div>
+    <div class="footer">
+        <p>&copy; {1} MedSecurance. All rights reserved.</p>
+        <p>This is an automated message, please do not reply.</p>
+    </div>
+</div>
+</body>
+</html>

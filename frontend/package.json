@@ -1,0 +1,59 @@
+{
+  "name": "med-sec-portal",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/cache": "11.10.8",
+    "@emotion/react": "11.10.8",
+    "@emotion/styled": "11.10.8",
+    "@mui/icons-material": "5.11.16",
+    "@mui/lab": "^5.0.0-alpha.170",
+    "@mui/material": "^5.15.18",
+    "@mui/x-date-pickers": "^7.5.0",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.7.2",
+    "chart.js": "4.3.0",
+    "chroma-js": "2.4.2",
+    "date-fns": "^2.28.0",
+    "jwt-decode": "^4.0.0",
+    "prop-types": "15.8.1",
+    "react": "^18.2.0",
+    "react-chartjs-2": "5.2.0",
+    "react-dom": "^18.2.0",
+    "react-github-btn": "1.4.0",
+    "react-router-dom": "^6.11.0",
+    "react-scripts": "5.0.1",
+    "react-table": "7.8.0",
+    "stylis": "4.1.4",
+    "stylis-plugin-rtl": "2.1.1",
+    "web-vitals": "^2.1.4",
+    "yup": "1.1.1"
+  },
+  "scripts": {
+    "start": "GENERATE_SOURCEMAP=false react-scripts start",
+    "build": "GENERATE_SOURCEMAP=false react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "install:clean": "rm -rf node_modules/ && rm -rf package-lock.json && npm install && npm start"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

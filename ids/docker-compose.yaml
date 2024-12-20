@@ -1,0 +1,8 @@
+services:
+  ids:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: medsec-ids
+    ports:
+      - "8501:8501"
