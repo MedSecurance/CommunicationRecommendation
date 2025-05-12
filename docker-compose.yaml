@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medsec-db
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medsec-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING}
+      Email__Host: ${EMAIL_HOST}
+      Email__HostPort: ${EMAIL_HOST_PORT}
+      Email__SenderEmail: ${EMAIL_SENDER_EMAIL}
+      Email__SenderPassword: ${EMAIL_SENDER_PASSWORD}
+      Email__SenderName: ${EMAIL_SENDER_NAME}
+      Keycloak__AuthorizationUrl: ${KEYCLOAK_BACKEND_URL}/realms/MedSec/protocol/openid-connect/auth
+      Keycloak__MetadataAddress: ${KEYCLOAK_BACKEND_URL}/realms/MedSec/.well-known/openid-configuration
+      Keycloak__Issuer: ${REACT_APP_KEYCLOAK_URL}/realms/MedSec
+      Keycloak__TokenUrl: ${KEYCLOAK_BACKEND_URL}/auth/realms/MedSec/protocol/openid-connect/token
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BASE_URL: ${REACT_APP_API_BASE_URL}
+        REACT_APP_KEYCLOAK_URL: ${REACT_APP_KEYCLOAK_URL}
+    container_name: medsec-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      
+  monitor-matrix:
+    # Uncomment the following for Linux deployment and comment the ports (see below)
+    # network_mode: "host" 
+    build:
+      context: ./monitor-matrix
+      dockerfile: Dockerfile
+      args:
+        MEDSEC_URL: ${MEDSEC_URL}
+        ADMIN_EMAIL: ${ADMIN_EMAIL}
+        UPDATE_DELAY_MINUTES: ${UPDATE_DELAY_MINUTES}
+        EMAIL_DELAY_DAYS: ${EMAIL_DELAY_DAYS}
+    container_name: medsec-monitor-matrix
+    volumes:
+      - user-data:/app/user-data
+    # Comment the following two lines for Linux deployment when using "network_mode: host" above
+    ports:
+      - "33761:33761"      
+
+  ids:
+    build:
+      context: ./ids
+      dockerfile: Dockerfile
+      args:
+        MEDSEC_URL: ${MEDSEC_URL}
+        ADMIN_EMAIL: ${ADMIN_EMAIL}
+    ports:
+      - "8501:8501"
+    container_name: medsec-ids
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: medsec-keycloak
+    command: start-dev --import-realm --verbose
+    
+    environment:
+      - KC_HEALTH_ENABLED=true
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./keycloak/extensions/spi-event-listener-0.0.1-SNAPSHOT.jar:/opt/keycloak/providers/spi-event-listener-0.0.1-SNAPSHOT.jar
+      - keycloak_identity_data:/opt/keycloak/data
+    ports:
+      - "8081:8080"
+
+volumes:
+  pgdata:
+  user-data:
+  keycloak_identity_data:
