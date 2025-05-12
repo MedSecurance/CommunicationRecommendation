@@ -1,5 +1,0 @@
-using MedSecurance.ProtocolEvaluator.Models.RiskAssessment;
-
-namespace MedSecurance.ProtocolEvaluator.Queries;
-
-public record GetRiskAssessmentByIdQueryResponse(RiskAssessment RiskAssessment);
