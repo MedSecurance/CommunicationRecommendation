@@ -3,11 +3,13 @@ const API_BASE_URL = process.env.REACT_APP_BASE_URL || "http://localhost:5287";
 
 export const postWifiAnswersToApi = async (answers, getAuthHeaders) => {
   try {
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/evaluate/wifi`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
       body: JSON.stringify(answers),
     });
@@ -27,11 +29,14 @@ export const postWifiAnswersToApi = async (answers, getAuthHeaders) => {
 
 export const postBluetoothAnswersToApi = async (answers, getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/evaluate/bluetooth`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
 
       },
       body: JSON.stringify(answers),
@@ -52,11 +57,14 @@ export const postBluetoothAnswersToApi = async (answers, getAuthHeaders) => {
 
 export const postLoraWanAnswersToApi = async (answers, getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/evaluate/lorawan`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
 
       },
       body: JSON.stringify(answers),
@@ -77,11 +85,14 @@ export const postLoraWanAnswersToApi = async (answers, getAuthHeaders) => {
 
 export const postGsmAnswersToApi = async (answers, getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/evaluate/gsm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
       body: JSON.stringify(answers),
     });
@@ -116,14 +127,15 @@ export const getRiskAssessments = async (apiRequest) => {
 };
 
 export const getRiskAssessmentById = async (id, getAuthHeaders) => {
-
-
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/risk-assessments/${id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     });
 

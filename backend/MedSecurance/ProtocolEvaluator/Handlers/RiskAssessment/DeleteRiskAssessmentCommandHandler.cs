@@ -3,6 +3,7 @@ using MediatR;
 using MedSecurance.ActivityLog.Models;
 using MedSecurance.ActivityLog.Models.Enums;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
+using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands.RiskAssessment;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
 
@@ -26,6 +27,7 @@ public class DeleteRiskAssessmentCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLogCategory.RiskAssessment,
             Action = ActivityLogAction.Delete,
             Details = $"RiskAssessment with id {request.Id} has been deleted"

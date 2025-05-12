@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
     Button, Select,
     MenuItem, FormControl, InputLabel, TextField,
-    Checkbox, FormControlLabel,
+    Checkbox,
     Dialog, DialogActions, DialogContent, DialogTitle,
-    Grid, IconButton, Snackbar, Alert, FormHelperText, Tooltip
+    Grid, IconButton, Snackbar, Alert, FormHelperText, Tooltip, Box, Typography
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { v4 as uuidv4 } from 'uuid'; // Import the v4 function from uuid
-
+import {validateMacAddress} from '../validators-helpers/input-validators'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+import CloseIcon from '@mui/icons-material/Close';
 
 import { validateNumberInput } from '../validators-helpers/numbers-validators'
 
@@ -36,11 +37,7 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
     };
 
     const [hub, setHub] = useState({
-        operation_frequencies: '2.4 GHz',
-        frequency_type: 'ISM bands',
-        number_of_channels: '40',
         gateway_intermediate_device: 'No',
-        average_power_consumption: '10 mW',
         authentication_method: '',
         secure_communication_channel: '',
         data_integrity: '',
@@ -59,11 +56,7 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
 
     useEffect(() => {
         setHub({
-            operation_frequencies: hubData.operation_frequencies ?? '2.4 GHz',
-            frequency_type: hubData.frequency_type ?? 'ISM bands',
-            number_of_channels: hubData.number_of_channels ?? '40',
             gateway_intermediate_device: hubData.gateway_intermediate_device ?? 'No',
-            average_power_consumption: hubData.average_power_consumption ?? '10 mW',
             authentication_method: hubData.authentication_method ?? '',
             secure_communication_channel: hubData.secure_communication_channel ?? '',
             data_integrity: hubData.data_integrity ?? '',
@@ -155,7 +148,7 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
 
         const newErrors = {};
         if (!hub.device_name) newErrors.device_name = 'Device Name is required';
-        if (!hub.mac_address) newErrors.mac_address = 'MAC Address is required';
+        validateMacAddress(hub.mac_address, 'mac_address' , newErrors)
         if (!hub.manufacturer) newErrors.manufacturer = 'Manufacturer is required';
         if (!hub.model) newErrors.model = 'Model is required';
 
@@ -178,20 +171,15 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
             return;
         }
 
-        const trueCount = hub.standardsDataList.reduce((count, obj) => obj.isDefault === true ? count + 1 : count, 0);
+        const hasDefault = hub.standardsDataList.some(item => item.isDefault);
 
-        if (trueCount !== 1) {
+        if (!hasDefault) {
             setSnackbarMessage('Set default standard');
             setSnackbarOpen(true);
             return;
         }
 
         if (hub.id) {
-
-            var defaultStandart = hub.standardsDataList[defaultStandardIndex];
-
-            if (defaultStandart)
-                defaultStandart.isDefault = true;
 
             setErrors({});
             updateAccessPointByUUID(hub);
@@ -205,9 +193,6 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
 
         setStandartSelections([]);
 
-        var defaultStandart = hub.standardsDataList[defaultStandardIndex];
-        defaultStandart.isDefault = true;
-
         hub.id = uuidv4();
 
         setErrors({});
@@ -215,14 +200,6 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
         resetData();
         setDefaultStandardIndex(-1);
         handleClose();
-    };
-
-    const handleCheckboxChange = (e) => {
-        const { name, checked } = e.target;
-        setHub(prevState => ({
-            ...prevState,
-            [name]: checked,
-        }));
     };
 
     const handleRemoveStandard = (index) => {
@@ -249,51 +226,6 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
             <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                     <FormControl fullWidth margin="normal">
-                        <Tooltip title="Specify the operational frequencies used by the hub (e.g., 2.4 GHz)" arrow>
-                            <TextField
-                                type="text"
-                                label="Operation Frequencies"
-                                name="operation_frequencies"
-                                id="1"
-                                value={hub.operation_frequencies}
-                                disabled={true}
-                                onChange={handleInputChange}
-                            />
-                        </Tooltip>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth margin="normal">
-                        <Tooltip title="Type of frequency range the hub supports (e.g., ISM bands)" arrow>
-                            <TextField
-                                type="text"
-                                label="Frequency Type"
-                                name="frequency_type"
-                                id="1233"
-                                value={hub.frequency_type}
-                                disabled={true}
-                                onChange={handleInputChange}
-                            />
-                        </Tooltip>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth margin="normal">
-                        <Tooltip title="Number of communication channels supported by the hub" arrow>
-                            <TextField
-                                type="text"
-                                label="Number of Channels"
-                                name="number_of_channels"
-                                id="123"
-                                value={hub.number_of_channels}
-                                disabled={true}
-                                onChange={handleInputChange}
-                            />
-                        </Tooltip>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth margin="normal">
                         <Tooltip title="Name assigned to this hub device" arrow>
                             <TextField
                                 type="text"
@@ -303,36 +235,6 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
                                 value={hub.device_name}
                                 error={!!errors.device_name}
                                 helperText={errors.device_name ?? ''}
-                                onChange={handleInputChange}
-                            />
-                        </Tooltip>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth margin="normal">
-                        <Tooltip title="Specify whether the hub uses a gateway or intermediate device" arrow>
-                            <TextField
-                                type="text"
-                                label="Gateway/Intermediate Device"
-                                name="gateway_intermediate_device"
-                                id="1322"
-                                value={hub.gateway_intermediate_device}
-                                disabled={true}
-                                onChange={handleInputChange}
-                            />
-                        </Tooltip>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth margin="normal">
-                        <Tooltip title="Average power consumption of the hub in milliwatts" arrow>
-                            <TextField
-                                type="text"
-                                label="Average Power Consumption"
-                                name="average_power_consumption"
-                                id="1322"
-                                value={hub.average_power_consumption}
-                                disabled={true}
                                 onChange={handleInputChange}
                             />
                         </Tooltip>
@@ -404,7 +306,6 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
                 </Grid>
                 <Grid item xs={12} sm={6}>
                     <FormControl fullWidth margin="normal">
-                        <Tooltip title="Select the type of antenna used by this hub" arrow>
                             <InputLabel>{'Antenna Type'}</InputLabel>
                             <Select
                                 label={'Antenna Type'}
@@ -424,11 +325,9 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
                             {errors.antenna_type && (
                                 <FormHelperText sx={{ color: 'red' }}>{errors.antenna_type}</FormHelperText>
                             )}
-                        </Tooltip>
                     </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-
                     <FormControl fullWidth margin="normal">
                         <InputLabel>{'Authentication Method'}</InputLabel>
                         <Select
@@ -516,33 +415,50 @@ const HubModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUU
                         variant="outlined"
                         onClick={() => showModal()}
                         style={{ color: 'black', borderColor: 'black', width: '100%', height: '56px' }}>
-                        {'Add Version'}
+                        {'Add Standard Version'}
                     </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
+
                     {hub.standardsDataList?.map((itemData, index) => (
-                        <Grid container alignItems="center" key={index}>
-                            <Grid item>
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={itemData.isDefault}
-                                            onChange={() => handleDefaultStandardChange(index)}
-                                        />
-                                    }
-                                    label={itemData.standar_name}
-                                />
+                        <Grid item container alignItems="center" key={index}>
+                            <Grid item xs={12} sm={6}>
+                                <Box display="flex" alignItems="center">
+                                    {/* Checkbox without label */}
+                                    <Checkbox
+                                        checked={itemData.isDefault}
+                                        onChange={() => handleDefaultStandardChange(index)}
+                                    />
+
+                                    {/* Label as Typography, to prevent Checkbox from triggering */}
+                                    <Typography
+                                        // onClick={() => handleOnClickStandard(itemData)} // Replace with desired action
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {itemData.standar_name}
+                                    </Typography>
+
+                                    {/* Close Icon for delete, positioned right next to the label */}
+                                    <IconButton onClick={() => handleRemoveStandard(index)} size="small">
+                                        <CloseIcon />
+                                    </IconButton>
+                                </Box>
                             </Grid>
+
+                            {/* Display success icon if the item is implemented */}
                             <Grid item>
                                 {itemData.isImplemented && <CheckCircleIcon color="success" />}
                             </Grid>
-                            <Grid item>
-                                <IconButton onClick={() => handleRemoveStandard(index)}>
-                                    <DeleteIcon />
-                                </IconButton>
-                            </Grid>
                         </Grid>
                     ))}
+                    {hub.standardsDataList?.length > 0 && !hub.standardsDataList.some(item => item.isDefault) && (
+                        <Box display="flex" alignItems="center" mt={2}>
+                            <InfoIcon color="primary" style={{ marginRight: '8px' }} />
+                            <Typography variant="body2" color="textSecondary">
+                                Check the utilized standard.
+                            </Typography>
+                        </Box>
+                    )}
                 </Grid>
                 <VersionModal open={modalOpen} handleClose={closeModal} updateStandartData={updateStandartData} standards={standartsState} activeAccessModalData={activeAccessModalData} />
             </Grid>

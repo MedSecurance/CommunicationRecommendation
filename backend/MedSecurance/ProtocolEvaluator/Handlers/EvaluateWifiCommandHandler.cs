@@ -2,6 +2,7 @@
 using MediatR;
 using MedSecurance.ActivityLog.Models;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
+using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
@@ -48,11 +49,17 @@ public class EvaluateWifiCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLog.Models.Enums.ActivityLogCategory.RiskAssessment,
             Action = ActivityLog.Models.Enums.ActivityLogAction.Execute,
             Details = $"{nameof(EvaluateWifiCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
 
-        return new EvaluateWifiCommandResponse(evaluatorResult.Suggestions);
+        return new EvaluateWifiCommandResponse(
+            evaluatorResult.Mitigations,
+            evaluatorResult.SafeConfigs,
+            evaluatorResult.Replacements,
+            evaluatorResult.Vulnerabilities
+        );
     }
 }

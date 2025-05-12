@@ -9,6 +9,8 @@ import {
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import InfoIcon from '@mui/icons-material/Info';
+
 import { v4 as uuidv4 } from 'uuid';
 
 import StandardModal from './standart-modal';
@@ -185,20 +187,16 @@ const AcessPointModal = ({ open, handleClose, updateAcessPoints, acessPointsData
             return;
         }
 
-        const trueCount = accessPoint.standardsDataList.reduce((count, obj) => obj.isDefault === true ? count + 1 : count, 0);
+        const hasDefault = accessPoint.standardsDataList.some(item => item.isDefault);
 
-        if (trueCount !== 1) {
+
+        if (!hasDefault) {
             setSnackbarMessage('Set default standard');
             setSnackbarOpen(true);
             return;
         }
 
         if (accessPoint.id) {
-
-            var defaultStandart = accessPoint.standardsDataList[defaultStandardIndex];
-
-            if (defaultStandart)
-                defaultStandart.isDefault = true;
 
             setErrors({});
             updateAccessPointByUUID(accessPoint);
@@ -211,9 +209,6 @@ const AcessPointModal = ({ open, handleClose, updateAcessPoints, acessPointsData
         }
 
         setStandartSelections([]);
-
-        var defaultStandart = accessPoint.standardsDataList[defaultStandardIndex];
-        defaultStandart.isDefault = true;
 
         accessPoint.id = uuidv4();
 
@@ -425,16 +420,27 @@ const AcessPointModal = ({ open, handleClose, updateAcessPoints, acessPointsData
                             </Grid>
                         </Grid>
                     ))}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                <Tooltip title="Click here to add standards .">
 
-                    <Button
-                        variant="outlined"
-                        onClick={() => showModal()}
-                        style={{ color: 'black', borderColor: 'black', width: '100%', height: '56px' }}>
-                        {'Add Standard'}
-                    </Button>
+                    {accessPoint.standardsDataList?.length > 0 && !accessPoint.standardsDataList.some(item => item.isDefault) && (
+                        <Box display="flex" alignItems="center" mt={2}>
+                            <InfoIcon color="primary" style={{ marginRight: '8px' }} />
+                            <Typography variant="body2" color="textSecondary">
+                                Check the utilized standard.
+                            </Typography>
+                        </Box>
+                    )}
+
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                    <Tooltip title="Click here to add standards .">
+
+                        <Button
+                            variant="outlined"
+                            onClick={() => showModal()}
+                            style={{ color: 'black', borderColor: 'black', width: '100%', height: '56px' }}>
+                            {'Add Standard'}
+                        </Button>
                     </Tooltip>
 
                 </Grid>

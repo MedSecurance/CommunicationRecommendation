@@ -4,19 +4,20 @@ import {
     MenuItem, FormControl, InputLabel, TextField,
     Checkbox, FormControlLabel,
     Dialog, DialogActions, DialogContent, DialogTitle,
-    Grid, IconButton, Snackbar, Alert, FormHelperText
+    Grid, IconButton, Snackbar, Alert, FormHelperText, Box, Typography
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { v4 as uuidv4 } from 'uuid'; // Import the v4 function from uuid
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
 
 import FrequencyBandModal from './frequency-band-modal';
 
 
 const GateWayModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUUID }) => {
 
-    const allStandarts = ['EU868', 'US915', 'AS923', 'AU915', 'CN470', 'KR920' , 'IN865' ,'RU864' , 'RU868'];
+    const allStandarts = ['EU868', 'US915', 'AS923', 'AU915', 'CN470', 'KR920'];
 
     const [standardValue, setStandartValue] = useState('');
     const [standarts, setStandartSelections] = useState([]);
@@ -71,9 +72,9 @@ const GateWayModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
             if (hubData.id &&
                 hubData.standardsDataList?.length > 0) {
                 hubData.standardsDataList.forEach(standardValue => {
-    
+
                     setStandartsState(prevState => prevState.filter(standard => standard !== standardValue.standar_name));
-    
+
                 });
             }
         }
@@ -172,18 +173,15 @@ const GateWayModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
             return;
         }
 
-        if (defaultStandardIndex < 0) {
+        const hasDefault = hub.standardsDataList.some(item => item.isDefault);
+
+        if (!hasDefault) {
             setSnackbarMessage('Set default standard');
             setSnackbarOpen(true);
             return;
         }
 
         if (hub.id) {
-
-            var defaultStandart = hub.standardsDataList[defaultStandardIndex];
-
-            if (defaultStandart)
-                defaultStandart.isDefault = true;
 
             setErrors({});
             updateAccessPointByUUID(hub);
@@ -196,9 +194,6 @@ const GateWayModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
         }
 
         setStandartSelections([]);
-
-        var defaultStandart = hub.standardsDataList[defaultStandardIndex];
-        defaultStandart.isDefault = true;
 
         hub.id = uuidv4();
 
@@ -342,7 +337,7 @@ const GateWayModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
                                 <Checkbox
                                     inputProps={{ 'aria-label': 'Adaptive Data Rate' }}
                                     name='adaptive_data_rate'
-                                    value={hub.adaptive_data_rate}
+                                    checked={hub.adaptive_data_rate}
                                     onChange={handleCheckboxChange}
                                 />
                             }
@@ -396,6 +391,14 @@ const GateWayModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
                             </Grid>
                         </Grid>
                     ))}
+                    {hub.standardsDataList?.length > 0 && !hub.standardsDataList.some(item => item.isDefault) && (
+                        <Box display="flex" alignItems="center" mt={2}>
+                            <InfoIcon color="primary" style={{ marginRight: '8px' }} />
+                            <Typography variant="body2" color="textSecondary">
+                                Check the utilized standard.
+                            </Typography>
+                        </Box>
+                    )}
                 </Grid>
                 <FrequencyBandModal open={modalOpen} handleClose={closeModal} updateStandartData={updateStandartData} standards={standartsState} activeAccessModalData={activeAccessModalData} />
             </Grid>

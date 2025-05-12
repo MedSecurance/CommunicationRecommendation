@@ -11,7 +11,8 @@ const gsmValidations = (gsmInputs) => {
         newErrors.network_name = 'Network name is required';
     }
     
-    validateNumberInput(gsmInputs.security_audit_frequency_in_years, 'security_audit_frequency_in_years' , newErrors);
+    validateNumberInput(gsmInputs.securityAuditFrequencyInYears, 'securityAuditFrequencyInYears' , newErrors);
+    validateNumberInput(gsmInputs.lifetime_in_years, 'lifetime_in_years' , newErrors);    
 
     return newErrors;
 };

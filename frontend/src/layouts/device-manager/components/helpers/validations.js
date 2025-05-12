@@ -1,4 +1,5 @@
 import {validateNumberInput} from '../../../riskassesment/protocols/validators-helpers/numbers-validators'
+import {validateMacAddress} from '../../../riskassesment/protocols/validators-helpers/input-validators'
 
 const ValidateProtocolsInputs = (errors, formData) => {
 
@@ -13,8 +14,8 @@ const ValidateProtocolsInputs = (errors, formData) => {
         if (formData.wifiSpecs.supportedStandards.length == 0) wifiSpecsErrors.supportedStandards = 'Supported Standards are required';
         if (formData.wifiSpecs.supportedFrequencies.length == 0) wifiSpecsErrors.supportedFrequencies = 'Supported Frequencies are required';
 
-        validateNumberInput(formData.wifiSpecs.bandwidth, 'bandwidth' , wifiSpecsErrors);
-       
+        validateMacAddress(formData.wifiSpecs.macAddress, 'macAddress' , wifiSpecsErrors);
+        
         if (Object.keys(wifiSpecsErrors).length > 0) {
             errors.wifiSpecs = wifiSpecsErrors;
         }
@@ -34,7 +35,7 @@ const ValidateProtocolsInputs = (errors, formData) => {
         if (formData.bluetoothSpecs.supportedAccessControlMechanisms.length == 0) bluetoothSpecsErrors.supportedAccessControlMechanisms = 'Supported AccessControl Mechanisms Topologies are required';
         if (formData.bluetoothSpecs.supportedVersions.length == 0) bluetoothSpecsErrors.supportedVersions = 'Supported Versions are required';
 
-        validateNumberInput(formData.bluetoothSpecs.bandwidth, 'bandwidth' , bluetoothSpecsErrors);
+        validateMacAddress(formData.bluetoothSpecs.macAddress, 'macAddress' , bluetoothSpecsErrors);
 
         if (Object.keys(bluetoothSpecsErrors).length > 0) {
             errors.bluetoothSpecs = bluetoothSpecsErrors;
@@ -46,12 +47,31 @@ const ValidateProtocolsInputs = (errors, formData) => {
         
         if (!formData.gsmSpecs.firmware) gsmSpecsErrors.firmware = 'Firmware is required';
         if (formData.gsmSpecs.supportedGenerations.length == 0) gsmSpecsErrors.supportedGenerations = 'Supported Generations are required';
+        
+        validateMacAddress(formData.gsmSpecs.macAddress, 'macAddress' , gsmSpecsErrors);
 
         if (Object.keys(gsmSpecsErrors).length > 0) {
             errors.gsmSpecs = gsmSpecsErrors;
         }
     }
 
+    if (formData.supportedCommunicationProtocols?.includes('LoraWan') && formData.lorawanSpecs) {
+        const lorawanSpecsErrors = {};
+       
+        if (!formData.lorawanSpecs.macAddress) lorawanSpecsErrors.macAddress = 'Mac Address is required';
+        if (!formData.lorawanSpecs.firmware) lorawanSpecsErrors.firmware = 'Firmware is required';
+        if (formData.lorawanSpecs.supportedFrequencyBands.length == 0) lorawanSpecsErrors.supportedFrequencyBands = 'Supported Frequency Bands are required';
+        if (!formData.lorawanSpecs.utilizedFrequencyBand) lorawanSpecsErrors.utilizedFrequencyBand = 'Utilized Frequency Band is required';
+        if (!formData.lorawanSpecs.physicalLocation) lorawanSpecsErrors.physicalLocation = 'Physical Location is required';
+        if (!formData.lorawanSpecs.joinMode) lorawanSpecsErrors.joinMode = 'Join Mode is required';
+
+
+        validateMacAddress(formData.lorawanSpecs.macAddress, 'macAddress' , lorawanSpecsErrors);
+
+        if (Object.keys(lorawanSpecsErrors).length > 0) {
+            errors.lorawanSpecs = lorawanSpecsErrors;
+        }
+    }
 }
 
 const BluetoothUtilized = (bluetoothSpecs) => {
@@ -72,12 +92,6 @@ const BluetoothUtilized = (bluetoothSpecs) => {
     }
 }
 
-const GsmStandartUtilized = (gsmSpecs) => {
-    if (gsmSpecs?.supportedGenerations?.length > 0) {
-        gsmSpecs.utilizedGeneration = gsmSpecs.supportedGenerations[0];
-    }
-}
-
 const SetDefaults = (formData) => {
     if (!formData.supportedCommunicationProtocols.includes('GSM')) {
         formData.gsmSpecs = null;
@@ -90,6 +104,10 @@ const SetDefaults = (formData) => {
     if (!formData.supportedCommunicationProtocols.includes('Bluetooth')) {
         formData.bluetoothSpecs = null;
     }
+
+    if (!formData.supportedCommunicationProtocols.includes('LoraWan')) {
+        formData.lorawanSpecs = null;
+    }
 }
 
 export const ValidateFromData = (formData) => {
@@ -100,12 +118,12 @@ export const ValidateFromData = (formData) => {
     if (!formData.manufacturer) newErrors.manufacturer = 'Manufacturer is required';
     if (!formData.description) newErrors.description = 'Description is required';
     if (!formData.type) newErrors.type = 'Type is required';
+    
     if (!formData.communicationProtocol || formData.supportedCommunicationProtocols.length === 0)
     { 
         newErrors.communicationProtocol = 'Communication Protocol is required';
     }
     if (!formData.networkName) newErrors.networkName = 'Network Name is required';
-    if (!formData.networkIdentifier) newErrors.networkIdentifier = 'Network Identifier is required';
     if (!formData.doctorId) newErrors.doctorId = 'Doctor Id is required';
     if (!formData.location) newErrors.location = 'Location is required';
 
@@ -118,7 +136,6 @@ export const ValidateFromData = (formData) => {
 export const SetProtocolsData = (formData) => {
 
     BluetoothUtilized(formData.bluetoothSpecs);
-    GsmStandartUtilized(formData.gsmSpecs);
     SetDefaults(formData);
 }
 

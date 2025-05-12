@@ -6,6 +6,7 @@ using MedSecurance.ActivityLog.Repositories.Interfaces;
 using MedSecurance.DeviceManager.Commands;
 using MedSecurance.DeviceManager.Extensions;
 using MedSecurance.DeviceManager.Repositories.Interfaces;
+using MedSecurance.Extensions;
 
 namespace MedSecurance.DeviceManager.Handlers;
 
@@ -34,6 +35,7 @@ public class UpdateDeviceCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLogCategory.DeviceManagement,
             Action = ActivityLogAction.Update,
             Details = $"Device with id {request.Id} has been updated"

@@ -9,11 +9,14 @@ const mapGsmApiData = (gsmData) => {
         logMonitoringEnabled: gsmData.log_monitoring_enabled,
         redundancyMeasures: gsmData.redundancy_measures,
         intrusionDetectionSystem: gsmData.intrusion_detection_system,
-        lifetimeInYears: gsmData.firmware_integrity_check,
-        dataPrivacyMeasures: { atRest: true, inTransit: true },
+        firmwareIntegrityCheck: gsmData.firmware_integrity_check,
+        lifetimeInYears: gsmData.lifetime_in_years,
+        dataPrivacyMeasures: { atRest: gsmData.at_rest, inTransit: gsmData.in_transit },
         securityAuditFrequencyInYears: gsmData.securityAuditFrequencyInYears,
         GsmNode: [],
-        NetworkFailures: []
+        NetworkFailures: [],
+        riskAssessmentBody: JSON.stringify(gsmData),
+        riskAssessmentId: gsmData.riskAssessmentId ?? null,
 
     }
 

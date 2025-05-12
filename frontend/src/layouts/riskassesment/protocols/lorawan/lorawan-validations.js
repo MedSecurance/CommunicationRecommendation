@@ -11,6 +11,7 @@ const loraWanValidations = (loraWanInputs) => {
     }
 
     validateNumberInput(loraWanInputs.security_audit_frequency_in_years, 'security_audit_frequency_in_years' , newErrors);
+    validateNumberInput(loraWanInputs.other_connected_devices, 'other_connected_devices' , newErrors);
 
     const networkDetails = loraWanInputs.network_details;
 

@@ -6,7 +6,11 @@ namespace MedSecurance.ProtocolEvaluator.Commands;
 
 public record EvaluateWifiCommand(
     bool FirewallEnabled,
+    bool AlreadyImplemented,
     bool LogMonitoringEnabled,
+    bool RedundancyMeasures,
+    bool IntrusionDetectionSystem,
+    bool FirmwareIntegrityCheck,
     string IpRange,
     int BackboneNetworkSpeedInMpbs,
     int IspConnectionSpeedInMpbs,
@@ -14,5 +18,6 @@ public record EvaluateWifiCommand(
     string? RiskAssessmentId,
     string RiskAssessmentBody,
     WifiPlacement Placement,
-    WifiNetworkDetails NetworkDetails) : IRequest<EvaluateWifiCommandResponse>;
+    WifiNetworkDetails NetworkDetails,
+    ICollection<TvraCve>? TvraCves) : IRequest<EvaluateWifiCommandResponse>;
     

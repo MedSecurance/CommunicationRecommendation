@@ -11,13 +11,13 @@ import NetworkFailures from '../components/network-failures-modal';
 
 const Gsm = ({ getProtocolData, protocolData, errors }) => {
 
-    const cause_of_failures = [{value : "HardwareIssue" , displayValue : "Hardware Issue"} , 
-    {value : "Interference" , displayValue : "Interference"},
-    {value : "NetworkCongestion" , displayValue : "Network Congestion"},
-    {value : "SoftwareFirmware" , displayValue : "Software Firmware"},
-    {value : "Power" , displayValue : "Power"},
-    {value : "Environment" , displayValue : "Environment"},
-    {value : "ConfigurationError" , displayValue : "Configuration Error"}];
+    const cause_of_failures = [{ value: "HardwareIssue", displayValue: "Hardware Issue" },
+    { value: "Interference", displayValue: "Interference" },
+    { value: "NetworkCongestion", displayValue: "Network Congestion" },
+    { value: "SoftwareFirmware", displayValue: "Software Firmware" },
+    { value: "Power", displayValue: "Power" },
+    { value: "Environment", displayValue: "Environment" },
+    { value: "ConfigurationError", displayValue: "Configuration Error" }];
 
     const [networkFailursModalOpen, setNetworkFailursModalOpen] = useState(false);
     const [activeNetworkFailuresModalData, setActiveNetworkFailuresModalData] = useState({});
@@ -29,21 +29,22 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
         communication_protocol_description: protocolData.communication_protocol_description ?? '',
         network_name: protocolData.network_name ?? '',
         already_implemented: protocolData.already_implemented ?? false,
+        firmware_integrity_check: protocolData.firmware_integrity_check ?? false,
         log_monitoring_enabled: protocolData.log_monitoring_enabled ?? false,
         redundancy_measures: protocolData.redundancy_measures ?? false,
         intrusion_detection_system: protocolData.intrusion_detection_system ?? false,
         securityAuditFrequencyInYears: protocolData.securityAuditFrequencyInYears ?? 0,
         network_failures: protocolData?.network_failures ?? [],
-        data_privacyMeasures: {
-            atRest: false,
-            inTransit: false
-        },
+        riskAssessmentId: protocolData.riskAssessmentId ?? null,
+        lifetime_in_years: protocolData.lifetime_in_years ?? 0,
+        at_rest: protocolData.at_rest ?? false,
+        in_transit: protocolData.in_transit ?? false,
         gsmNodes: protocolData.gsmNodes ?? []
     });
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
-    
+
 
     const handleAddedItemNetworkFailuresClick = (itemData) => {
         setActiveNetworkFailuresModalData(itemData);
@@ -83,7 +84,7 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
     const updateHub = (updatedAccessPoints) => {
         setGsmAnswers(prevState => ({
             ...prevState,
-            gsmNodes: [...prevState.gsmNodes , updatedAccessPoints]
+            gsmNodes: [...prevState.gsmNodes, updatedAccessPoints]
         }));
     };
 
@@ -114,7 +115,7 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
 
                 return {
                     ...prevState,
-                        network_failures: newNetworkFailes
+                    network_failures: newNetworkFailes
                 };
             }
 
@@ -127,10 +128,10 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
 
         setGsmAnswers(prevState => ({
             ...prevState,
-                network_failures: [
-                    ...prevState.network_failures,
-                    updatedNetworkFailures
-                ]
+            network_failures: [
+                ...prevState.network_failures,
+                updatedNetworkFailures
+            ]
         }));
     };
 
@@ -181,11 +182,11 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
     const handleDeleteItem = (index) => {
         // Update the list to remove the item at the given index
         const updatedList = gsmAnswers?.network_failures.filter((_, i) => i !== index);
-        
+
         // Assuming you're using state to manage the list
         setGsmAnswers(prevState => ({
             ...prevState,
-                network_failures: updatedList,
+            network_failures: updatedList,
         }));
     };
 
@@ -239,6 +240,21 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
                 </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    inputProps={{ 'aria-label': 'Firmware Integrity Check' }}
+                                    name='firmware_integrity_check'
+                                    checked={gsmAnswers.firmware_integrity_check}
+                                    onChange={handleCheckboxChange}
+                                />
+                            }
+                            label={'Firmware Integrity Check'}
+                        />
+                    </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                     <FormControlLabel
                         control={
@@ -287,15 +303,29 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
                 <FormControl fullWidth>
                     <TextField
                         type='number'
-                        name='security_audit_frequency_in_years'
-                        value={gsmAnswers?.security_audit_frequency_in_years}
-                        error={!!errors.security_audit_frequency_in_years}
-                        helperText={errors.security_audit_frequency_in_years ?? ''}
+                        name='securityAuditFrequencyInYears'
+                        value={gsmAnswers?.securityAuditFrequencyInYears}
+                        error={!!errors.securityAuditFrequencyInYears}
+                        helperText={errors.securityAuditFrequencyInYears ?? ''}
                         onChange={handleInputChange}
                         label='Security Audit Frequency In Years'
                         id='8'
                     />
                 </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                        <TextField
+                            type='number'
+                            label='Lifetime in Years'
+                            id='87'
+                            value={gsmAnswers?.lifetime_in_years}
+                            name='lifetime_in_years'
+                            onChange={handleInputChange}
+                            error={!!errors.lifetime_in_years}
+                            helperText={errors.lifetime_in_years ?? ''}
+                        />
+                    </FormControl>
             </Grid>
             <Grid item xs={12}>
                 <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
@@ -324,7 +354,7 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
                             {itemData.device_name}
                         </li>
                     ))}
-            </Grid>  
+            </Grid>
             <Grid item xs={12} sm={6}>
                 <Button
                     variant="outlined"
@@ -369,7 +399,42 @@ const Gsm = ({ getProtocolData, protocolData, errors }) => {
                         </li>
                     ))
                 }
-            </Grid>     
+            </Grid>
+            <Grid item xs={12}>
+                <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
+                    <Typography variant="h6">{'Data Privacy Measures'}</Typography>
+                </Box>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                inputProps={{ 'aria-label': 'At Rest' }}
+                                name='at_rest'
+                                checked={gsmAnswers.at_rest}
+                                onChange={handleCheckboxChange}
+                            />
+                        }
+                        label={'At Rest'}
+                    />
+                </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                inputProps={{ 'aria-label': 'In Transitt' }}
+                                name='in_transit'
+                                checked={gsmAnswers.in_transit}
+                                onChange={handleCheckboxChange}
+                            />
+                        }
+                        label={'In Transitt'}
+                    />
+                </FormControl>
+            </Grid>
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>
                     {snackbarMessage}

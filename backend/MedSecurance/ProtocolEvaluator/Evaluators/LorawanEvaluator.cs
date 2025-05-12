@@ -1,3 +1,4 @@
+using MedSecurance.DeviceManager.Models;
 using MedSecurance.DeviceManager.Queries;
 using MedSecurance.DeviceManager.Repositories.Interfaces;
 using MedSecurance.ProtocolEvaluator.Commands.Lorawan;
@@ -18,13 +19,16 @@ public class LorawanEvaluator(
     ILogger<LorawanEvaluator> logger,
     IOptions<ProtocolEvaluatorConfig> protocolEvaluatorConfigOptions,
     IDeviceRepository deviceRepository,
-    IAdminConfigRepository adminConfigRepository)
+    IAdminConfigRepository adminConfigRepository,
+    IProtocolReplacementEvaluator protocolReplacementEvaluator)
     : ILorawanEvaluator
 {
     private readonly LorawanConfig _lorawanConfig = protocolEvaluatorConfigOptions.Value.Lorawan;
     private readonly LorawanNodeConfig _lorawanNodeConfig = protocolEvaluatorConfigOptions.Value.LorawanNode;
 
-    private readonly ICollection<string> _suggestions = new List<string>();
+    private readonly ICollection<EvaluationSuggestion> _mitigationSuggestions = new List<EvaluationSuggestion>();
+    private readonly ICollection<EvaluationSuggestion> _safeConfigSuggestions = new List<EvaluationSuggestion>();
+
     private int _totalGatewayBandwidth;
     private readonly Dictionary<string, bool> _gatewayAdaptiveDataRate = new();
     private decimal _totalNodeBandwidth;
@@ -33,7 +37,7 @@ public class LorawanEvaluator(
     public async Task<EvaluationResult> Evaluate(EvaluateLorawanCommand command)
     {
         logger.LogInformation("Evaluate LoraWan");
-        
+
         var adminConfigs =
             await adminConfigRepository.GetAdminConfigsAsync(new GetAdminConfigsQuery(Protocol.LoraWan));
 
@@ -43,15 +47,21 @@ public class LorawanEvaluator(
 
         _lorawanConfig.MeanTimeToRepairInMinutes =
             int.Parse(adminConfigs
-                .FirstOrDefault(x => x is { Property: "MeanTimeToRepairInMinutes", Protocol: Protocol.LoraWan })?.Value!);
+                .FirstOrDefault(x => x is { Property: "MeanTimeToRepairInMinutes", Protocol: Protocol.LoraWan })
+                ?.Value!);
 
         _lorawanConfig.LifetimeInYears =
             int.Parse(adminConfigs
                 .FirstOrDefault(x => x is { Property: "LifetimeInYears", Protocol: Protocol.LoraWan })?.Value!);
-        
+
+        var nodes = await deviceRepository.GetAllDevicesAsync(new GetDevicesQuery(
+            Protocol.LoraWan,
+            NetworkName: command.NetworkName
+        ));
+
         MulticastSuggestions(command.NetworkDetails.MulticastEnable);
         GatewaySuggestions(command.NetworkDetails);
-        await LorawanNodeSuggestions(command.NetworkDetails.DeploymentCountry);
+        LorawanNodeSuggestions(command.NetworkDetails.DeploymentCountry, nodes);
         NetworkAdaptiveDataRateSuggestions();
         NetworkBandwidthSuggestions(command.NetworkDetails.NetworkServer.BandwidthInMbps,
             command.NetworkDetails.ApplicationServer.BandwidthInMbps);
@@ -68,9 +78,18 @@ public class LorawanEvaluator(
         DataPrivacyMeasuresSuggestions(command.DataPrivacyMeasures);
         NetworkFailuresSuggestions(command.NetworkFailures);
 
+        var protocolReplacementEvaluationResult = protocolReplacementEvaluator.Evaluate(
+            command.NetworkName,
+            Protocol.LoraWan,
+            nodes,
+            command.AlreadyImplemented
+        );
+
         return new EvaluationResult
         {
-            Suggestions = _suggestions
+            Mitigations = _mitigationSuggestions.DistinctBy(x => x.Message).ToList(),
+            SafeConfigs = _safeConfigSuggestions.DistinctBy(x => x.Message).ToList(),
+            Replacements = protocolReplacementEvaluationResult
         };
     }
 
@@ -80,8 +99,9 @@ public class LorawanEvaluator(
 
         if (!networkDetailsMulticastEnable)
         {
-            _suggestions.Add(
-                "1. Multicast suggestion: Consider enabling multicast if you are using group communication with your devices.");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Multicast suggestion: Consider enabling multicast if you are using group communication with your devices.",
+                3);
         }
     }
 
@@ -117,8 +137,9 @@ public class LorawanEvaluator(
 
             if (bandSuggestions.Count > 0)
             {
-                _suggestions.Add(
-                    $"2.1. Frequency band suggestion: [{gatewayName}] The selected frequency band ({selectedFrequencyBand}) is currently not supported in your country ({deploymentCountry}). Consider switching to one of the following: {string.Join(", ", bandSuggestions)}");
+                SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                    $"Frequency band suggestion: [{gatewayName}] The selected frequency band ({selectedFrequencyBand}) is currently not supported in your country ({deploymentCountry}). Consider switching to one of the following: {string.Join(", ", bandSuggestions)}",
+                    5);
             }
         }
     }
@@ -134,8 +155,9 @@ public class LorawanEvaluator(
 
         if (gatewayBackboneConnectionTypeSuggestions.Count > 0)
         {
-            _suggestions.Add(
-                $"2.2. Gateway connection suggestions: [{gatewayName}] Consider upgrading your gateway backbone connection with one of the following in the current order if possible: {string.Join(", ", gatewayBackboneConnectionTypeSuggestions)}");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                $"Gateway connection suggestions: [{gatewayName}] Consider upgrading your gateway backbone connection with one of the following in the current order if possible: {string.Join(", ", gatewayBackboneConnectionTypeSuggestions)}",
+                4);
         }
     }
 
@@ -144,8 +166,9 @@ public class LorawanEvaluator(
         var yearDiff = DateTime.Now.Year - firmwareUpdatedYear;
         // TODO: Threshold should be configurable ??
         if (yearDiff >= 2)
-            _suggestions.Add(
-                $"2.3. Firmware upgrade suggestion: [{gatewayName}] The firmware is more than {yearDiff} years old. We suggest you upgrade your firmware.");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                $"Firmware upgrade suggestion: [{gatewayName}] The firmware is more than {yearDiff} years old. We suggest you upgrade your firmware.",
+                4);
     }
 
     private void PhysicalLocationSuggestions(PhysicalLocation selectedPhysicalLocation, string gatewayName)
@@ -156,15 +179,14 @@ public class LorawanEvaluator(
             .ToList();
 
         if (strongerPhysicalLocation.Count > 0)
-            _suggestions.Add(
-                $"2.4. Physical location upgrade suggestions: [{gatewayName}] We suggest to upgrade the physical location with one of the following options in the current order: {string.Join(", ", strongerPhysicalLocation)}");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                $"Physical location upgrade suggestions: [{gatewayName}] We suggest to upgrade the physical location with one of the following options in the current order: {string.Join(", ", strongerPhysicalLocation)}",
+                3);
     }
 
-    private async Task LorawanNodeSuggestions(Countries deploymentCountry)
+    private void LorawanNodeSuggestions(Countries deploymentCountry, ICollection<Device> nodes)
     {
         logger.LogInformation("Checking LoRaWAN node suggestion");
-        
-        var nodes = await deviceRepository.GetAllDevicesAsync(new GetDevicesQuery(Protocol.LoraWan));
 
         foreach (var node in nodes)
         {
@@ -172,13 +194,14 @@ public class LorawanEvaluator(
             var selectedFrequencyBand = node.LorawanSpecs.UtilizedFrequencyBand;
             var baseFrequencyBand = _lorawanConfig.FrequencyBandOptions[selectedFrequencyBand];
             var regulatoryCompliance = baseFrequencyBand.RegulatoryCompliance;
-        
+
             FrequencyBandSuggestions(regulatoryCompliance, deploymentCountry, nodeName, selectedFrequencyBand);
             FirmwareUpdatedYearSuggestions(node.LorawanSpecs.FirmwareDate.Year, nodeName);
             PhysicalLocationSuggestions(node.LorawanSpecs.PhysicalLocation, nodeName);
             JoinModeSuggestions(node.LorawanSpecs.JoinMode, nodeName);
-        
-            var nodeBandwidth = _lorawanConfig.FrequencyBandOptions[node.LorawanSpecs.UtilizedFrequencyBand].DataRateInKbps[1] /
+
+            var nodeBandwidth = _lorawanConfig.FrequencyBandOptions[node.LorawanSpecs.UtilizedFrequencyBand]
+                                    .DataRateInKbps[1] /
                                 1000;
             _totalNodeBandwidth += nodeBandwidth;
             _nodeAdaptiveDataRate.Add(nodeName, node.LorawanSpecs.AdaptiveDataRate);
@@ -198,29 +221,38 @@ public class LorawanEvaluator(
 
         if (joinModeSuggestions.Count > 0)
         {
-            _suggestions.Add(
-                $"3.4. Join Mode suggestions: [{nodeName}] We suggest to upgrade the node 'Join Mode' with one of the following options in the current order: {string.Join(", ", joinModeSuggestions)}");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                $"Join Mode suggestions: [{nodeName}] We suggest to upgrade the node 'Join Mode' with one of the following options in the current order: {string.Join(", ", joinModeSuggestions)}",
+                4);
         }
     }
 
     private void NetworkAdaptiveDataRateSuggestions()
     {
         logger.LogInformation("Checking adaptive data rate suggestion");
-        
-        bool allTrueInBoth = _gatewayAdaptiveDataRate.All(kvp => kvp.Value) && _nodeAdaptiveDataRate.All(kvp => kvp.Value);
-        bool allFalseInBoth = _gatewayAdaptiveDataRate.All(kvp => !kvp.Value) && _nodeAdaptiveDataRate.All(kvp => !kvp.Value);
+
+        bool allTrueInBoth = _gatewayAdaptiveDataRate.All(kvp => kvp.Value) &&
+                             _nodeAdaptiveDataRate.All(kvp => kvp.Value);
+        bool allFalseInBoth = _gatewayAdaptiveDataRate.All(kvp => !kvp.Value) &&
+                              _nodeAdaptiveDataRate.All(kvp => !kvp.Value);
 
         if (allTrueInBoth)
         {
-            _suggestions.Add("4.1.2. Adaptive data rate info: Currently your network is configured with adaptive data rate option equal to true.");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Adaptive data rate info: Currently your network is configured with adaptive data rate option equal to true.",
+                1);
         }
         else if (allFalseInBoth)
         {
-            _suggestions.Add("4.1.3. Adaptive data rate info: Currently your network is configured with adaptive data rate option equal to false.");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Adaptive data rate info: Currently your network is configured with adaptive data rate option equal to false.",
+                1);
         }
         else
         {
-            _suggestions.Add($"4.1.1. Adaptive data rate suggestion: Currently your network has nodes and or gateways that have both enable and disable the adaptive data rate option. Consider defaulting to one options across the network. See a detailed report below: \n{string.Join("\n", _gatewayAdaptiveDataRate.Select(kvp => $"{kvp.Key}: {kvp.Value}"))} \n{string.Join("\n", _nodeAdaptiveDataRate.Select(kvp => $"{kvp.Key}: {kvp.Value}"))} ");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                $"Adaptive data rate suggestion: Currently your network has nodes and or gateways that have both enable and disable the adaptive data rate option. Consider defaulting to one options across the network. See a detailed report below: \n{string.Join("\n", _gatewayAdaptiveDataRate.Select(kvp => $"{kvp.Key}: {kvp.Value}"))} \n{string.Join("\n", _nodeAdaptiveDataRate.Select(kvp => $"{kvp.Key}: {kvp.Value}"))} ",
+                3);
         }
     }
 
@@ -229,16 +261,19 @@ public class LorawanEvaluator(
         logger.LogInformation("Checking network bandwidth suggestion");
 
         if (_totalGatewayBandwidth < _totalNodeBandwidth)
-            _suggestions.Add(
-                $"4.2.1. Network bandwidth suggestions: The total IoMT data transfer rate ({_totalNodeBandwidth:.2f} Mbps) is higher than the total gateways data rate ({_totalGatewayBandwidth} Mbps). Your network gateways needs additional {_totalNodeBandwidth - _totalGatewayBandwidth:.2f} Mbps of bandwidth.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Network bandwidth suggestions: The total IoMT data transfer rate ({_totalNodeBandwidth:.2f} Mbps) is higher than the total gateways data rate ({_totalGatewayBandwidth} Mbps). Your network gateways needs additional {_totalNodeBandwidth - _totalGatewayBandwidth:.2f} Mbps of bandwidth.",
+                4);
 
         if (networkServerBandwidth < _totalNodeBandwidth)
-            _suggestions.Add(
-                $"4.2.2. Network bandwidth suggestions: The total IoMT data transfer rate ({_totalNodeBandwidth:.2f} Mbps) is higher than the total Network Server data rate ({networkServerBandwidth} Mbps). Your network gateways needs additional {_totalNodeBandwidth - networkServerBandwidth:.2f} Mbps of bandwidth.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Network bandwidth suggestions: The total IoMT data transfer rate ({_totalNodeBandwidth:.2f} Mbps) is higher than the total Network Server data rate ({networkServerBandwidth} Mbps). Your network gateways needs additional {_totalNodeBandwidth - networkServerBandwidth:.2f} Mbps of bandwidth.",
+                4);
 
         if (applicationServerBandwidth < _totalNodeBandwidth)
-            _suggestions.Add(
-                $"4.2.3. Network bandwidth suggestions: The total IoMT data transfer rate ({_totalNodeBandwidth:.2f} Mbps) is higher than the total Application Server data rate ({applicationServerBandwidth} Mbps). Your network gateways needs additional {_totalNodeBandwidth - applicationServerBandwidth:.2f} Mbps of bandwidth.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Network bandwidth suggestions: The total IoMT data transfer rate ({_totalNodeBandwidth:.2f} Mbps) is higher than the total Application Server data rate ({applicationServerBandwidth} Mbps). Your network gateways needs additional {_totalNodeBandwidth - applicationServerBandwidth:.2f} Mbps of bandwidth.",
+                4);
     }
 
     private void FirewallStatusSuggestions(bool firewallStatusFlagNetwork, bool firewallStatusFlagApplication)
@@ -247,13 +282,14 @@ public class LorawanEvaluator(
 
         if (!firewallStatusFlagNetwork)
         {
-            _suggestions.Add("4.3.1 Firewall suggestion: Need to enable a firewall for your Network Server");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Firewall suggestion: Need to enable a firewall for your Network Server", 5);
         }
 
         if (!firewallStatusFlagApplication)
         {
-            _suggestions.Add(
-                "4.3.2 Firewall suggestion: Need to enable a firewall for your Application Server");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Firewall suggestion: Need to enable a firewall for your Application Server", 5);
         }
     }
 
@@ -263,13 +299,14 @@ public class LorawanEvaluator(
 
         if (!logMonitoringFlagNetwork)
         {
-            _suggestions.Add("4.4.1 Log monitoring suggestion: Need to enable log monitoring for your Network Server");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Log monitoring suggestion: Need to enable log monitoring for your Network Server", 4);
         }
 
         if (!logMonitoringFlagApplication)
         {
-            _suggestions.Add(
-                "4.4.2 Log monitoring suggestion: Need to enable log monitoring for your Application Server");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                "Log monitoring suggestion: Need to enable log monitoring for your Application Server", 4);
         }
     }
 
@@ -280,8 +317,9 @@ public class LorawanEvaluator(
         var networkLifetimeThreshold = _lorawanConfig.LifetimeInYears;
 
         if (selectedNetworkLifetime > networkLifetimeThreshold)
-            _suggestions.Add(
-                $"4.5.1 Network aging suggestion: Your network is more than {networkLifetimeThreshold} years old. Consider replacing your network.");
+            SuggestionUtils.AddSuggestion(_safeConfigSuggestions,
+                $"Network aging suggestion: Your network is more than {networkLifetimeThreshold} years old. Consider replacing your network.",
+                2);
     }
 
     private void OtherDevicesSuggestions(int otherConnectedDevices)
@@ -289,8 +327,9 @@ public class LorawanEvaluator(
         logger.LogInformation("Checking other connected devices suggestion");
 
         if (otherConnectedDevices > 0)
-            _suggestions.Add(
-                $"4.6.1 Other connected devices suggestion: You have {otherConnectedDevices} connected devices that are not IoMT. Consider removing them to increase your network security.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Other connected devices suggestion: You have {otherConnectedDevices} connected devices that are not IoMT. Consider removing them to increase your network security.",
+                3);
     }
 
     private void SecurityAuditFrequencySuggestions(int selectedSecurityAuditFrequency)
@@ -300,8 +339,9 @@ public class LorawanEvaluator(
         var securityAuditFrequencyThreshold = _lorawanConfig.SecurityAuditFrequencyInYears;
 
         if (selectedSecurityAuditFrequency > securityAuditFrequencyThreshold)
-            _suggestions.Add(
-                $"4.7.1 Network security audit frequency: Your network security audit frequency is {selectedSecurityAuditFrequency} years which is more than {securityAuditFrequencyThreshold} year which is the recommended threshold. Consider reducing your network security audit below or equal to {securityAuditFrequencyThreshold} year(s).");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Network security audit frequency: Your network security audit frequency is {selectedSecurityAuditFrequency} years which is more than {securityAuditFrequencyThreshold} year which is the recommended threshold. Consider reducing your network security audit below or equal to {securityAuditFrequencyThreshold} year(s).",
+                4);
     }
 
     private void RedundancyMeasuresSuggestions(bool redundancyMeasuresFlag)
@@ -310,8 +350,8 @@ public class LorawanEvaluator(
 
         if (!redundancyMeasuresFlag)
         {
-            _suggestions.Add(
-                "4.7.1. Redundancy measure suggestion: Need to enable redundancy measures in your network.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                "Redundancy measure suggestion: Need to enable redundancy measures in your network.", 4);
         }
     }
 
@@ -321,8 +361,9 @@ public class LorawanEvaluator(
 
         if (!intrusionDetectionFlag)
         {
-            _suggestions.Add(
-                "4.9.1. Intrusion detection system suggestion: Need to deploy an intrusion detection system in your network.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                "Intrusion detection system suggestion: Need to deploy an intrusion detection system in your network.",
+                5);
         }
     }
 
@@ -332,8 +373,9 @@ public class LorawanEvaluator(
 
         if (!firmwareIntegrityFlag)
         {
-            _suggestions.Add(
-                "4.10.1. Firmware integrity check suggestion: Need to enable firmware integrity checks if supported by your network hardware.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                "Firmware integrity check suggestion: Need to enable firmware integrity checks if supported by your network hardware.",
+                4);
         }
     }
 
@@ -342,12 +384,13 @@ public class LorawanEvaluator(
         logger.LogInformation("Checking data privacy measures suggestion");
 
         if (!selectedDataPrivacyMeasures.AtRest)
-            _suggestions.Add(
-                "4.11.1. Data privacy measure suggestion: Need to enable data privacy measures for data at rest.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                "Data privacy measure suggestion: Need to enable data privacy measures for data at rest.", 4);
 
         if (!selectedDataPrivacyMeasures.InTransit)
-            _suggestions.Add(
-                "4.11.2. Data privacy measure suggestion: Need to enable data privacy measures for data in transit.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                "Data privacy measure suggestion: Need to enable data privacy measures for data in transit.",
+                4);
     }
 
     private void NetworkFailuresSuggestions(List<NetworkFailure> networkFailures)
@@ -371,8 +414,9 @@ public class LorawanEvaluator(
             if (failureSuggestions.Count == 0)
                 continue;
 
-            _suggestions.Add(
-                $"15.1 For '{cause}' failure we suggest the following action(s): {string.Join(", ", failureSuggestions)}.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"For '{cause}' failure we suggest the following action(s): {string.Join(", ", failureSuggestions)}.",
+                3);
 
             totalRepairTime += failure.TimeToRepairInMinutes;
             totalDowntime += failure.DowntimeInMinutes;
@@ -382,12 +426,14 @@ public class LorawanEvaluator(
         var meanDowntime = totalDowntime / totalFailures;
 
         if (meanDowntime > meanDowntimeThreshold)
-            _suggestions.Add(
-                $"15.2 Your mean downtime is {meanDowntime} minutes which is above your organization threshold of '{meanDowntimeThreshold}' minutes. Consider reducing your mean downtime below the {meanDowntimeThreshold} minutes threshold.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Your mean downtime is {meanDowntime} minutes which is above your organization threshold of '{meanDowntimeThreshold}' minutes. Consider reducing your mean downtime below the {meanDowntimeThreshold} minutes threshold.",
+                3);
 
         if (meanTimeToRepair > meanTimeToRepairThreshold)
-            _suggestions.Add(
-                $"15.3 Your mean time to repair is {meanTimeToRepair} minutes which is above your organization threshold of '{meanTimeToRepairThreshold}' minutes. Consider reducing your mean time to repair below the {meanTimeToRepairThreshold} minutes threshold.");
+            SuggestionUtils.AddSuggestion(_mitigationSuggestions,
+                $"Your mean time to repair is {meanTimeToRepair} minutes which is above your organization threshold of '{meanTimeToRepairThreshold}' minutes. Consider reducing your mean time to repair below the {meanTimeToRepairThreshold} minutes threshold.",
+                3);
     }
 
     private static List<LorawanFrequencyBands> DetectCompatibleBand(
@@ -403,34 +449,4 @@ public class LorawanEvaluator(
 
         return new List<LorawanFrequencyBands>();
     }
-
-    // TODO: This method should be removed once the nodes are retrieved from the DB
-    // private List<LorawanNode> GenerateRandomNodes(int numberOfNodes, string networkName)
-    // {
-    //     var random = new Random();
-    //     var nodes = new List<LorawanNode>();
-    //
-    //     for (var n = 0; n < numberOfNodes; n++)
-    //     {
-    //         var supportedFrequencyBands = _lorawanNodeConfig.SupportedFrequencyBands
-    //             .OrderBy(x => random.Next())
-    //             .Take(random.Next(1, _lorawanNodeConfig.SupportedFrequencyBands.Count + 1))
-    //             .ToList();
-    //
-    //         nodes.Add(new LorawanNode
-    //         {
-    //             Name = $"node_{n + 1}",
-    //             NetworkName = networkName,
-    //             JoinMode = _lorawanNodeConfig.JoinModeOptions[random.Next(_lorawanNodeConfig.JoinModeOptions.Count)],
-    //             SupportedFrequencyBands = supportedFrequencyBands,
-    //             FrequencyBandUtilized = supportedFrequencyBands[random.Next(supportedFrequencyBands.Count)],
-    //             PhysicalLocation =
-    //                 _lorawanNodeConfig.PhysicalLocations[random.Next(_lorawanNodeConfig.PhysicalLocations.Count)],
-    //             AdaptiveDataRate = random.Next(2) == 1,
-    //             FirmwareUpdatedYear = random.Next(2000, 2025)
-    //         });
-    //     }
-    //
-    //    return nodes;
-    //}
 }

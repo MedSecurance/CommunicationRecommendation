@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MediatR;
 using MedSecurance.ActivityLog.Models;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
+using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands.AdminConfig;
 using MedSecurance.ProtocolEvaluator.Queries;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
@@ -34,6 +35,7 @@ public class UpdateAdminConfigCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLog.Models.Enums.ActivityLogCategory.AdminConfig,
             Action = ActivityLog.Models.Enums.ActivityLogAction.Update,
             Details =

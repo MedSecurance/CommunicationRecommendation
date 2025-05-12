@@ -1,31 +1,28 @@
 import { React, useState } from 'react';
 import {
     Button, FormControl, TextField,
-    Grid, Typography, Box, Paper, Checkbox, FormControlLabel
+    Grid, Typography
 } from '@mui/material';
 
-export const ThreeG = ({ updateStandartData, setStandartValue }) => {
-
-    const [shouldImplement, setShouldImplement] = useState(false);
+export const ThreeG = ({ updateStandartData, handleClose }) => {
 
     const handleAddStandart = () => {
         // Create a copy of the current prodocolData state
         const updatedProdocolData = { ...prodocolData };
         // Update the prodocolData state with the modified object
         setProdocolData(updatedProdocolData);
-        // Call the function to update standart data (assuming this function works correctly)
-        updatedProdocolData.isImplemented = shouldImplement;
+
         updateStandartData(updatedProdocolData);
-        // Reset the standart value if needed
-        setStandartValue('');
+
+        handleClose();
     };
 
     const handleCancelAddStandart = () => {
-        setStandartValue('');
+        handleClose();
     };
 
     const [prodocolData, setProdocolData] = useState({
-        standar_name: '3G',
+         standar_name: '3G',
         latency_in_milliseconds: '<100',
         data_rate_in_Mbps: '1 - 2',
         spectrum_efficiency: 'Moderate',
@@ -39,19 +36,6 @@ export const ThreeG = ({ updateStandartData, setStandartValue }) => {
 
     return (
         <Grid container spacing={2}>
-            <Grid item xs={12}>
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={shouldImplement}
-                            onChange={(e) => setShouldImplement(e.target.checked)}
-                        />
-                    }
-                    label="Should Implement"
-                />
-            </Grid>
-            {shouldImplement && (
-                <>
             <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                     <TextField
@@ -190,8 +174,6 @@ export const ThreeG = ({ updateStandartData, setStandartValue }) => {
                     />
                 </FormControl>
             </Grid>
-                </>
-            )}
             <Grid item xs={6} sm={3}>
                 <Button
                     variant="outlined"
@@ -211,24 +193,21 @@ export const ThreeG = ({ updateStandartData, setStandartValue }) => {
         </Grid>
     );
 };
-export const FourG = ({ updateStandartData, setStandartValue }) => {
-
-    const [shouldImplement, setShouldImplement] = useState(false);
+export const FourG = ({ updateStandartData, handleClose }) => {
 
     const handleAddStandart = () => {
         // Create a copy of the current prodocolData state
         const updatedProdocolData = { ...prodocolData };
         // Update the prodocolData state with the modified object
         setProdocolData(updatedProdocolData);
-        // Call the function to update standart data (assuming this function works correctly)
-        updatedProdocolData.isImplemented = shouldImplement;
+
         updateStandartData(updatedProdocolData);
-        // Reset the standart value if needed
-        setStandartValue('');
+
+        handleClose();
     };
 
     const handleCancelAddStandart = () => {
-        setStandartValue('');
+        handleClose();
     };
 
     const [prodocolData, setProdocolData] = useState({
@@ -246,19 +225,6 @@ export const FourG = ({ updateStandartData, setStandartValue }) => {
 
     return (
         <Grid container spacing={2}>
-            <Grid item xs={12}>
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={shouldImplement}
-                            onChange={(e) => setShouldImplement(e.target.checked)}
-                        />
-                    }
-                    label="Should Implement"
-                />
-            </Grid>
-            {shouldImplement && (
-                <>
             <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                     <TextField
@@ -397,8 +363,6 @@ export const FourG = ({ updateStandartData, setStandartValue }) => {
                     />
                 </FormControl>
             </Grid>
-                </>
-            )}
             <Grid item xs={6} sm={3}>
                 <Button
                     variant="outlined"
@@ -418,24 +382,22 @@ export const FourG = ({ updateStandartData, setStandartValue }) => {
         </Grid>
     );
 };
-export const FiveG = ({ updateStandartData, setStandartValue }) => {
+export const FiveG = ({ updateStandartData, handleClose }) => {
 
-    const [shouldImplement, setShouldImplement] = useState(false);
-
+   
     const handleAddStandart = () => {
         // Create a copy of the current prodocolData state
         const updatedProdocolData = { ...prodocolData };
         // Update the prodocolData state with the modified object
         setProdocolData(updatedProdocolData);
-        // Call the function to update standart data (assuming this function works correctly)
-        updatedProdocolData.isImplemented = shouldImplement;
+
         updateStandartData(updatedProdocolData);
-        // Reset the standart value if needed
-        setStandartValue('');
+
+        handleClose();
     };
 
     const handleCancelAddStandart = () => {
-        setStandartValue('');
+        handleClose();
     };
 
     const [prodocolData, setProdocolData] = useState({
@@ -453,19 +415,6 @@ export const FiveG = ({ updateStandartData, setStandartValue }) => {
 
     return (
         <Grid container spacing={2}>
-            <Grid item xs={12}>
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={shouldImplement}
-                            onChange={(e) => setShouldImplement(e.target.checked)}
-                        />
-                    }
-                    label="Should Implement"
-                />
-            </Grid>
-            {shouldImplement && (
-                <>
             <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                     <TextField
@@ -604,8 +553,6 @@ export const FiveG = ({ updateStandartData, setStandartValue }) => {
                     />
                 </FormControl>
             </Grid>
-                </>
-            )}
             <Grid item xs={6} sm={3}>
                 <Button
                     variant="outlined"
@@ -625,3 +572,4 @@ export const FiveG = ({ updateStandartData, setStandartValue }) => {
         </Grid>
     );
 };
+

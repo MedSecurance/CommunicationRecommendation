@@ -8,8 +8,6 @@ export const deviceManagerToolTips =
     Description : "A small description about the device",
     NetworkName : "Specify the network name witch device is deployed",
     DoctorId : "Set the doctor ID",
-    NetworkIdentifier : "Specify the network identifier",
-    BatteryStatus : "Set the device battery status",
     Location : "Set the device location. eg: Open space , Private place , Secure place",
     Validated : "Check if device is validated",
     StandardCompliance : "Check if device is standard compliance",

@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Commands.AdminConfig;
 using MedSecurance.ProtocolEvaluator.Commands.Gsm;
@@ -16,10 +17,24 @@ public static class ProtocolEvaluatorEndpointsInit
     {
         app
             .MapPost("protocol-evaluator/evaluate/wifi",
-                async (EvaluateWifiCommand command, IMediator mediator) => { return await mediator.Send(command); })
+                async (EvaluateWifiCommand command, IMediator mediator, IValidator<EvaluateWifiCommand> validator) =>
+                {
+                    var validationResult = await validator.ValidateAsync(command);
+                    if (!validationResult.IsValid)
+                    {
+                        var errorMessages = validationResult.Errors
+                            .Select(x => $"{x.PropertyName}: {x.ErrorMessage}")
+                            .ToList();
+                        
+                        return Results.BadRequest(errorMessages);
+                    }
+                    
+                    var commandResponse = await mediator.Send(command);
+                    return Results.Ok(commandResponse);
+                })
             .WithName("Evaluate Wifi")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("Create");
 
         app
             .MapPost("protocol-evaluator/evaluate/bluetooth",
@@ -29,28 +44,29 @@ public static class ProtocolEvaluatorEndpointsInit
                 })
             .WithName("Evaluate Bluetooth")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("Create");
 
         app
             .MapPost("protocol-evaluator/evaluate/lorawan",
                 async (EvaluateLorawanCommand command, IMediator mediator) => { return await mediator.Send(command); })
             .WithName("Evaluate Lorawan")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("Create");
 
         app
             .MapPost("protocol-evaluator/evaluate/gsm",
                 async (EvaluateGsmCommand command, IMediator mediator) => { return await mediator.Send(command); })
             .WithName("Evaluate GSM")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("Create");
 
         app
             .MapGet("protocol-evaluator/risk-assessments",
                 async (IMediator mediator) => { return await mediator.Send(new GetRiskAssessmentsQuery()); })
             .WithName("Get Risk Assessments")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("View");
+
 
         app
             .MapGet("protocol-evaluator/risk-assessments/{id:guid}",
@@ -60,7 +76,7 @@ public static class ProtocolEvaluatorEndpointsInit
                 })
             .WithName("Get Risk Assessment By Id")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("View");
 
         app.MapDelete("protocol-evaluator/risk-assessments/{id:guid}",
                 async (IMediator mediator, Guid id) =>
@@ -71,7 +87,7 @@ public static class ProtocolEvaluatorEndpointsInit
                 })
             .WithName("Delete Risk Assessment")
             .WithTags("Protocol Evaluator")
-            .RequireAuthorization();
+            .RequireAuthorization("Delete");
 
         app
             .MapGet("protocol-evaluator/admin-config",
@@ -81,9 +97,9 @@ public static class ProtocolEvaluatorEndpointsInit
                     return await mediator.Send(new GetAdminConfigsQuery(communicationProtocol, property, value));
                 })
             .WithName("Get Admin Config")
-            .WithTags("Protocol Evaluator");
-        //TODO: Add authorization
-        //.RequireAuthorization();
+            .WithTags("Protocol Evaluator")
+            .RequireAuthorization("UserAdmin");
+
 
         app.MapPut("protocol-evaluator/admin-config",
                 async (IMediator mediator, UpdateAdminConfigCommand command) =>
@@ -100,9 +116,9 @@ public static class ProtocolEvaluatorEndpointsInit
                     }
                 })
             .WithName("Update Admin Config")
-            .WithTags("Protocol Evaluator");
-        // TODO: Add authorization
-        //.RequireAuthorization();
+            .WithTags("Protocol Evaluator")
+            .RequireAuthorization("UserAdmin");
+
 
         return app;
     }

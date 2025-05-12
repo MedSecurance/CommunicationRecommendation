@@ -2,12 +2,13 @@ import {
     Button, Select,
     MenuItem, FormControl, InputLabel, TextField, Box,
     Grid, Checkbox, FormControlLabel,
-    Typography, Paper, FormHelperText, Snackbar, Alert
+    Typography, Paper, FormHelperText, Snackbar, Alert, Tooltip
 } from '@mui/material';
 
 import React, { useEffect, useState } from 'react';
 import GateWayModal from './gateway-modal';
-
+import { DeploymentCountryOptions } from './data-helper'
+import NetworkFailures from '../components/network-failures-modal';
 
 const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
 
@@ -22,7 +23,11 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
         intrusion_detection_system: protocolData.intrusion_detection_system ?? false,
         firmware_integrity_check: protocolData.firmware_integrity_check ?? false,
         security_audit_frequency_in_years: protocolData.security_audit_frequency_in_years ?? 0,
+        riskAssessmentId: protocolData.riskAssessmentId ?? null,
+        in_transit: protocolData.in_transit ?? false,
+        at_rest: protocolData.at_rest ?? false,
         network_details: {
+            network_failures: protocolData?.network_details?.network_failures ?? [],
             gateways: protocolData?.network_details?.gateways ?? [],
             deployment_country: protocolData?.network_details?.deployment_country ?? '',
             lifetime_in_years: protocolData?.network_details?.lifetime_in_years ?? '',
@@ -45,13 +50,26 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
         other_connected_devices: protocolData.other_connected_devices ?? 0
     });
 
+    const cause_of_failures = [{ value: "HardwareIssue", displayValue: "Hardware Issue" },
+    { value: "Interference", displayValue: "Interference" },
+    { value: "Overload", displayValue: "Overload" },
+    { value: "SoftwareFirmware", displayValue: "Software Firmware" },
+    { value: "Power", displayValue: "Power" },
+    { value: "Environment", displayValue: "Environment" },
+    { value: "ConfigurationError", displayValue: "Configuration Error" },
+    { value: "NetworkCongestion", displayValue: "Network Congestion" }];
+
     useEffect(() => {
-        if(errors.gateways){
+
+        if (errors.gateways && !lorawanAnswers.network_details.gateways.length) {
             setSnackbarMessage("Please add gateways");
             setSnackbarOpen(true);
+            errors.gateways = undefined;
+
         }
         getProtocolData(lorawanAnswers);
     }, [lorawanAnswers, errors]);
+
 
     const showModal = () => {
         setActiveMeshsModalData({});
@@ -60,6 +78,23 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
+
+    const [activeNetworkFailuresModalData, setActiveNetworkFailuresModalData] = useState({});
+
+    const handleDeleteItem = (index) => {
+        // Update the list to remove the item at the given index
+        const updatedList = lorawanAnswers.network_details?.network_failures.filter((_, i) => i !== index);
+
+        // Assuming you're using state to manage the list
+        setLorawanAnswers(prevState => ({
+            ...prevState,
+            network_details: {
+                ...prevState.network_details,
+                network_failures: updatedList,
+            },
+        }));
+    };
+
 
     const handleCloseSnackbar = () => {
         setSnackbarOpen(false);
@@ -151,6 +186,57 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
 
     };
 
+    const [networkFailursModalOpen, setNetworkFailursModalOpen] = useState(false);
+
+    const CloseNerworkFailureModal = () => {
+        setNetworkFailursModalOpen(false);
+    };
+
+    const updateNetworkFailures = (updatedNetworkFailures) => {
+
+        setLorawanAnswers(prevState => ({
+            ...prevState,
+            network_details: {
+                ...prevState.network_details,
+                network_failures: [
+                    ...prevState.network_details.network_failures,
+                    updatedNetworkFailures
+                ]
+            }
+        }));
+    };
+
+    const updateNetworkFailersByUUID = (updatedNetworkFail) => {
+        setLorawanAnswers(prevState => {
+            const networkFailures = prevState.network_details.network_failures;
+            const index = networkFailures.findIndex(ap => ap.id === updatedNetworkFail.id);
+            if (index !== -1) {
+                const newNetworkFailes = [...networkFailures];
+                newNetworkFailes[index] = { ...newNetworkFailes[index], ...updatedNetworkFail };
+
+                return {
+                    ...prevState,
+                    network_details: {
+                        ...prevState.network_details,
+                        network_failures: newNetworkFailes
+                    }
+                };
+            }
+
+            // If the UUID is not found, return the original state
+            return prevState;
+        });
+    };
+
+    const showNetworkFailuresModal = () => {
+        setActiveNetworkFailuresModalData({});
+        setNetworkFailursModalOpen(true);
+    };
+
+    const handleAddedItemNetworkFailuresClick = (itemData) => {
+        setActiveNetworkFailuresModalData(itemData);
+        setNetworkFailursModalOpen(true);
+    };
 
     return (
         <Grid container spacing={2}>
@@ -256,6 +342,68 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                     />
                 </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                    <TextField
+                        type='number'
+                        label='Other Connected Devices'
+                        id='6'
+                        value={lorawanAnswers?.other_connected_devices}
+                        name='other_connected_devices'
+                        onChange={handleInputChange}
+                        error={!!errors.other_connected_devices}
+                        helperText={errors.other_connected_devices ?? ''}
+                    />
+                </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <Tooltip title="Click here to add network failures for this protocol.">
+                    <Button
+                        variant="outlined"
+                        onClick={() => showNetworkFailuresModal()}
+                        style={{ color: 'black', borderColor: 'black', width: '100%', height: '56px' }}>
+                        {'Add NETWORK FAILURES'}
+                    </Button>
+                </Tooltip>
+
+                {
+                    lorawanAnswers.network_details?.network_failures?.map((itemData, index) => (
+                        <li
+                            key={index}
+                            style={{
+                                cursor: 'pointer',
+                                fontSize: 'smaller',
+                                color: 'blue',
+                                textDecoration: 'underline'
+                            }}
+                        >
+                            <span
+                                onClick={() => handleAddedItemNetworkFailuresClick(itemData)}
+                                style={{ flex: 1, marginRight: '10px' }} // Add some margin between text and button
+                            >
+                                {itemData.cause_of_failure}
+                            </span>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent triggering the span's onClick
+                                    handleDeleteItem(index);
+                                }}
+                                style={{
+                                    background: 'transparent',
+                                    color: 'red',
+                                    border: 'none',
+                                    fontSize: 'small',
+                                    cursor: 'pointer',
+                                    padding: '0',
+                                    margin: '0',             // Ensure no extra margin is applied
+                                }}
+                            >
+                                X
+                            </button>
+                        </li>
+                    ))
+                }
+            </Grid>
             <Grid item xs={12}>
                 <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
                     <Typography variant="h6">{'Network details'}</Typography>
@@ -285,17 +433,25 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                     ))}
             </Grid>
             <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                    <TextField
-                        type='text'
+                <FormControl fullWidth margin="normal">
+                    <InputLabel>{'Deployment Country'}</InputLabel>
+                    <Select
+                        label="Deployment Country"
                         name='network_details.deployment_country'
+                        id='6'
                         value={lorawanAnswers?.network_details?.deployment_country}
                         onChange={handleInputChange}
-                        label='Deployment Country'
-                        id='6'
-                        error={!!errors.deployment_country}
-                        helperText={errors.deployment_country ?? ''}
-                    />
+                    >
+                        {
+                            DeploymentCountryOptions?.map((itemData) => (
+                                <MenuItem key={itemData.value} value={itemData.value}>{itemData.label}</MenuItem>
+
+                            ))}
+
+                    </Select>
+                    {errors.deployment_country && (
+                        <FormHelperText sx={{ color: 'red' }}>{errors.deployment_country}</FormHelperText>
+                    )}
                 </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -357,8 +513,8 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                         <MenuItem key={'cloud'} value={'cloud'}>{'Cloud'}</MenuItem>
                     </Select>
                     {errors.networkServerDeploymentType && (
-                            <FormHelperText sx={{ color: 'red' }}>{errors.networkServerDeploymentType}</FormHelperText>
-                        )}
+                        <FormHelperText sx={{ color: 'red' }}>{errors.networkServerDeploymentType}</FormHelperText>
+                    )}
                 </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -400,8 +556,8 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                         onChange={handleInputChange}
                         label='Bandwidth in Mbps'
                         id='12'
-                        error={!!errors.networkServerBandwidth}
-                        helperText={errors.networkServerBandwidth ?? ''}
+                        error={!!errors.bandwidth_in_Mbps}
+                        helperText={errors.bandwidth_in_Mbps ?? ''}
                     />
                 </FormControl>
             </Grid>
@@ -435,8 +591,8 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                         <MenuItem key={'cloud'} value={'cloud'}>{'Cloud'}</MenuItem>
                     </Select>
                     {errors.applicationServerDeploymentType && (
-                            <FormHelperText sx={{ color: 'red' }}>{errors.applicationServerDeploymentType}</FormHelperText>
-                        )}
+                        <FormHelperText sx={{ color: 'red' }}>{errors.applicationServerDeploymentType}</FormHelperText>
+                    )}
                 </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -483,42 +639,38 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                     />
                 </FormControl>
             </Grid>
-            <Grid item xs={12} style={{ textAlign: 'left', gridColumn: 'auto' }}>
-                <Typography variant="h6">{'IoMt Details'}</Typography>
+            <Grid item xs={12}>
+                <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
+                    <Typography variant="h6">{'Data Privacy Measures'}</Typography>
+                </Box>
             </Grid>
             <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
-                    <TextField
-                        type='number'
-                        label='Number Of Sensors'
-                        id='12'
-                        value={lorawanAnswers?.iomt_details?.number_of_sensors}
-                        onChange={handleInputChange}
-                        name='iomt_details.number_of_sensors'
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                inputProps={{ 'aria-label': 'At Rest' }}
+                                name='at_rest'
+                                checked={lorawanAnswers.at_rest}
+                                onChange={handleCheckboxChange}
+                            />
+                        }
+                        label={'At Rest'}
                     />
                 </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
-                    <TextField
-                        type='number'
-                        label='Number Of Connected Devices'
-                        id='13'
-                        value={lorawanAnswers?.iomt_details?.number_of_connected_devices}
-                        onChange={handleInputChange}
-                        name='iomt_details.number_of_connected_devices'
-                    />
-                </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                    <TextField
-                        type='number'
-                        label='Number Of Actuators'
-                        id='14'
-                        value={lorawanAnswers?.iomt_details?.number_of_actuators}
-                        onChange={handleInputChange}
-                        name='iomt_details.number_of_actuators'
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                inputProps={{ 'aria-label': 'In Transitt' }}
+                                name='in_transit'
+                                checked={lorawanAnswers.in_transit}
+                                onChange={handleCheckboxChange}
+                            />
+                        }
+                        label={'In Transitt'}
                     />
                 </FormControl>
             </Grid>
@@ -527,6 +679,10 @@ const LoraWAN = ({ getProtocolData, protocolData, errors }) => {
                     {snackbarMessage}
                 </Alert>
             </Snackbar>
+            <NetworkFailures open={networkFailursModalOpen}
+                handleClose={CloseNerworkFailureModal}
+                updateNetworkFailures={updateNetworkFailures}
+                networkFailureData={activeNetworkFailuresModalData} updateNetworkFailersByUUID={updateNetworkFailersByUUID} causeOffailures={cause_of_failures} />
             <GateWayModal open={modalOpen} handleClose={closeModal} updateHub={updateHub} hubData={activeMeshsModalData} updateAccessPointByUUID={updateAccessPointByUUID} />
         </Grid>
     )

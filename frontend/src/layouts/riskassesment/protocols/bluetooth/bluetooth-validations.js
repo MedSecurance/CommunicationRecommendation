@@ -22,6 +22,8 @@ const bluetoothValidations = (bluetoothInputs) => {
     const meshDetails = bluetoothInputs.mesh_details;
     const deploymentDetails = meshDetails.deployment_details;
 
+    validateNumberInput(meshDetails.other_connected_devices, 'other_connected_devices' , newErrors);
+
     if (!deploymentDetails.topology_type) {
         newErrors.topology_type = 'Topology type is required';
     }

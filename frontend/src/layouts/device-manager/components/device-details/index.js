@@ -13,14 +13,19 @@ import { useParams } from 'react-router-dom';
 import { DatePicker } from '@mui/x-date-pickers'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { AuthContext } from '../../../../auth/AuthContext';
+import { KeycloakContext } from '../../../../keycloak-provider';
 import { ValidateFromData, SetProtocolsData } from '../helpers/validations'
-import { standardsUtilizedItems } from '../helpers/data-helper';
+import { standardsUtilizedItems, gsmGenerationsMapping, encryptionItems } from '../helpers/data-helper';
+import { hasPermission } from '../../../../authentication-helpers/role-validator'
+import {useFormHandlers} from "../../../../hooks/useFormHandlers";
 
 
 const DeviceDetails = () => {
 
-    const { getAuthHeaders } = useContext(AuthContext);
+    const { getAuthHeaders, roles } = useContext(KeycloakContext);
+
+    const canUpdate = hasPermission(roles, 'DeviceManager', 'update');
+
 
     // Fetch data from API
     const { deviceId } = useParams();
@@ -31,6 +36,7 @@ const DeviceDetails = () => {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarMessageSeverity, setSnackbarMessageSeverity] = useState('');
     const [frequenciesToSelect, setFrequenciesToSelect] = useState([]);
+    const [encryptionToSelect, setEncryptionToSelect] = useState([]);
 
     const handleCloseSnackbar = () => {
         setSnackbarOpen(false);
@@ -50,19 +56,16 @@ const DeviceDetails = () => {
                     manufacturingDate: response.manufacturingDate ? new Date(response.manufacturingDate) : new Date(),
                     communicationProtocol: response.communicationProtocol,
                     networkName: response.networkName,
-                    networkIdentifier: response.networkIdentifier,
                     doctorId: response.doctorId,
                     location: response.location,
-                    batteryStatus: response.batteryStatus,
                     validated: response.validated,
                     standardCompliance: response.standardCompliance,
                     supportedCommunicationProtocols: response.supportedCommunicationProtocols ?? [],
                     wifiSpecs: {
                         ipAddress: response.wifiSpecs?.ipAddress ?? "",
                         encryption: response.wifiSpecs?.encryption ?? "",
-                        bandwidth: response.wifiSpecs?.bandwidth ?? 0,
                         firmware: response.wifiSpecs?.firmware ?? "",
-                        macAddress : response.wifiSpecs?.macAddress ?? "",
+                        macAddress: response.wifiSpecs?.macAddress ?? "",
                         firmwareDate: response.wifiSpecs?.firmwareDate ? new Date(response.wifiSpecs?.firmwareDate) : new Date(),
                         supportedStandards: response.wifiSpecs?.supportedStandards ?? [],
                         supportedFrequencies: response.wifiSpecs?.supportedFrequencies ?? [],
@@ -70,17 +73,15 @@ const DeviceDetails = () => {
                         frequencyUtilized: response.wifiSpecs?.frequencyUtilized,
                     },
                     gsmSpecs: {
-                        bandwidth: response.gsmSpecs?.bandwidth ?? 0,
                         firmware: response.gsmSpecs?.firmware ?? "",
-                        macAddress : response.gsmSpecs?.macAddress ?? "",
+                        macAddress: response.gsmSpecs?.macAddress ?? "",
                         firmwareDate: response.gsmSpecs?.firmwareDate ? new Date(response.gsmSpecs?.firmwareDate) : new Date(),
                         supportedGenerations: response.gsmSpecs?.supportedGenerations ?? [],
-                        utilizedGeneration: "",
+                        utilizedGeneration: response.gsmSpecs?.utilizedGeneration,
                     },
                     bluetoothSpecs: {
-                        bandwidth: response.bluetoothSpecs?.bandwidth ?? 0,
                         firmware: response.bluetoothSpecs?.firmware ?? "",
-                        macAddress : response.bluetoothSpecs?.macAddress ?? "",
+                        macAddress: response.bluetoothSpecs?.macAddress ?? "",
                         firmwareDate: response.bluetoothSpecs?.firmwareDate ? new Date(response.bluetoothSpecs?.firmwareDate) : new Date(),
                         supportedAntenas: response.bluetoothSpecs?.supportedAntenas ?? [],
                         supportedAuthenticationMethods: response.bluetoothSpecs?.supportedAuthenticationMethods ?? [],
@@ -90,20 +91,35 @@ const DeviceDetails = () => {
                         supportedVersions: response.bluetoothSpecs?.supportedVersions?.map(value => {
                             // Convert to a decimal if it's a whole number with a trailing zero
                             return value.toFixed(1);
-                          }) ?? [],
+                        }) ?? [],
                         utilizedAntena: "",
                         utilizedAuthenticationMethod: "",
                         utilizedDataIntegrity: "",
                         utilizedTopology: "",
                         utilizedAccessControlMechanism: "",
                         utilizedVersion: response.bluetoothSpecs?.utilizedVersion.toFixed(1).toString() ?? '',
+                    },
+                    lorawanSpecs: {
+                        macAddress: response.lorawanSpecs?.macAddress ?? "",
+                        firmware: response.lorawanSpecs?.firmware ?? "",
+                        firmwareDate: response.lorawanSpecs?.firmwareDate ? new Date(response.lorawanSpecs?.firmwareDate) : new Date(),
+                        supportedFrequencyBands: response.lorawanSpecs?.supportedFrequencyBands ?? [],
+                        utilizedFrequencyBand: response.lorawanSpecs?.utilizedFrequencyBand ?? "",
+                        physicalLocation: response.lorawanSpecs?.physicalLocation ?? "",
+                        adaptiveDataRate: response.lorawanSpecs?.adaptiveDataRate ?? false,
+                        joinMode: response.lorawanSpecs?.joinMode ?? ""
                     }
                 });
 
                 //Set wifi standards utilized freg
                 const frequenciesSupported = standardsUtilizedItems[response.wifiSpecs?.standardUtilized];
-                if(frequenciesSupported)
+                if (frequenciesSupported)
                     setFrequenciesToSelect(frequenciesSupported);
+
+                if (response.wifiSpecs?.standardUtilized && response.wifiSpecs?.frequencyUtilized) {
+                    const encryptionSupported = encryptionItems[response.wifiSpecs.standardUtilized][response.wifiSpecs?.frequencyUtilized];
+                    setEncryptionToSelect(encryptionSupported);
+                }
 
             } catch (error) {
 
@@ -163,22 +179,53 @@ const DeviceDetails = () => {
         }));
     };
 
+    const handleUtilizedFregChange = (e, specKey, field) => {
+
+        const value = e.target.value;
+
+        const encryptionSupported = encryptionItems[formData.wifiSpecs.standardUtilized][value];
+
+        setEncryptionToSelect(encryptionSupported);
+
+        setFormData({
+            ...formData,
+            [specKey]: {
+                ...formData[specKey],
+                [field]: Array.isArray(value) ? value : e.target.value,
+                ["encryption"]: ""
+            }
+        });
+    };
+
     const handleProtocolChange = (e) => {
         const protocol = e.target.name;
+        const isChecked = e.target.checked;
+
         setFormData((prevState) => {
-            const newProtocols = prevState.supportedCommunicationProtocols.includes(protocol)
-                ? prevState.supportedCommunicationProtocols.filter(p => p !== protocol)
-                : [...prevState.supportedCommunicationProtocols, protocol];
-            return { ...prevState, supportedCommunicationProtocols: newProtocols };
+            let newSupportedProtocols = isChecked
+                ? [...prevState.supportedCommunicationProtocols, protocol]
+                : prevState.supportedCommunicationProtocols.filter(p => p !== protocol);
+
+            let newCommunicationProtocol = prevState.communicationProtocol;
+
+            // Remove from communicationProtocol if it matches the unchecked protocol
+            if (!isChecked && prevState.communicationProtocol === protocol) {
+                newCommunicationProtocol = '';
+            }
+
+            return {
+                ...prevState,
+                supportedCommunicationProtocols: newSupportedProtocols,
+                communicationProtocol: newCommunicationProtocol
+            };
         });
 
-        if(formData.gsmSpecs === null){
+        if (formData.gsmSpecs === null) {
             setFormData(prevState => ({
                 ...prevState,
-                ["gsmSpecs"]:  {
-                    bandwidth: 0,
+                ["gsmSpecs"]: {
                     firmware: "",
-                    macAddress : "",
+                    macAddress: "",
                     firmwareDate: new Date(),
                     supportedGenerations: [],
                     utilizedGeneration: "",
@@ -186,11 +233,10 @@ const DeviceDetails = () => {
             }));
         }
 
-        if(formData.bluetoothSpecs === null) {
+        if (formData.bluetoothSpecs === null) {
             setFormData(prevState => ({
                 ...prevState,
                 ["bluetoothSpecs"]: {
-                    bandwidth: 0,
                     firmware: "",
                     firmwareDate: new Date(),
                     supportedAntenas: [],
@@ -209,19 +255,34 @@ const DeviceDetails = () => {
             }));
         }
 
-        if(formData.wifiSpecs === null) {
+        if (formData.wifiSpecs === null) {
             setFormData(prevState => ({
                 ...prevState,
                 ["wifiSpecs"]: {
                     ipAddress: "",
                     encryption: "",
-                    bandwidth: 0,
                     firmware: "",
                     firmwareDate: new Date(),
                     supportedStandards: [],
                     supportedFrequencies: [],
                     standardUtilized: "",
                     frequencyUtilized: "",
+                },
+            }));
+        }
+
+        if (formData.lorawanSpecs === null) {
+            setFormData(prevState => ({
+                ...prevState,
+                ["lorawanSpecs"]: {
+                    macAddress: "",
+                    firmware: "",
+                    firmwareDate: new Date(),
+                    supportedFrequencyBands: [],
+                    utilizedFrequencyBand: "",
+                    physicalLocation: "",
+                    adaptiveDataRate: false,
+                    joinMode: ""
                 },
             }));
         }
@@ -236,17 +297,14 @@ const DeviceDetails = () => {
         manufacturingDate: new Date(),
         communicationProtocol: '',
         networkName: '',
-        networkIdentifier: '',
         doctorId: '',
         location: '',
-        batteryStatus: 0,
         validated: false,
         standardCompliance: false,
         supportedCommunicationProtocols: [],
         wifiSpecs: {
             ipAddress: "",
             encryption: "",
-            bandwidth: 0,
             firmware: "",
             firmwareDate: new Date(),
             supportedStandards: [],
@@ -255,14 +313,12 @@ const DeviceDetails = () => {
             frequencyUtilized: "",
         },
         gsmSpecs: {
-            bandwidth: 0,
             firmware: "",
             firmwareDate: new Date(),
             supportedGenerations: [],
             utilizedGeneration: "",
         },
         bluetoothSpecs: {
-            bandwidth: 0,
             firmware: "",
             firmwareDate: new Date(),
             supportedAntenas: [],
@@ -277,6 +333,16 @@ const DeviceDetails = () => {
             utilizedTopology: "",
             utilizedAccessControlMechanism: "",
             utilizedVersion: ""
+        },
+        lorawanSpecs: {
+            macAddress: "",
+            firmware: "",
+            firmwareDate: new Date(),
+            supportedFrequencyBands: [],
+            utilizedFrequencyBand: "",
+            physicalLocation: "",
+            adaptiveDataRate: false,
+            joinMode: ""
         }
     }); // State to manage form data
 
@@ -291,12 +357,15 @@ const DeviceDetails = () => {
         });
     };
 
+    const { handleCheckboxChange } = useFormHandlers(setFormData);
+
     const handleUtilizedStandardChange = (e, specKey, field) => {
 
         const value = e.target.value;
 
         const frequenciesSupported = standardsUtilizedItems[value];
 
+        setEncryptionToSelect([]);
         setFrequenciesToSelect(frequenciesSupported);
 
         setFormData({
@@ -307,7 +376,7 @@ const DeviceDetails = () => {
                 ["frequencyUtilized"]: ""
             }
         });
-        
+
     };
 
     const renderProtocolFields = () => {
@@ -323,18 +392,9 @@ const DeviceDetails = () => {
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
                                 <TextField
-                                    label="Bandwidth"
-                                    type="number"
-                                    value={formData.wifiSpecs.bandwidth || ''}
-                                    onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'bandwidth')}
-                                />
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <TextField
                                     label="Ip Adress"
                                     type="text"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.ipAddress || ''}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'ipAddress')}
                                     error={!!errors.wifiSpecs?.ipAddress}
@@ -347,6 +407,7 @@ const DeviceDetails = () => {
                                 <TextField
                                     label="MacAdress"
                                     type="text"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.macAddress || ''}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'macAddress')}
                                     error={!!errors.wifiSpecs?.macAddress}
@@ -358,6 +419,7 @@ const DeviceDetails = () => {
                             <FormControl fullWidth margin="normal">
                                 <TextField
                                     label="Firmware"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.firmware || ''}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'firmware')}
                                     error={!!errors.wifiSpecs?.firmware}
@@ -370,6 +432,7 @@ const DeviceDetails = () => {
                                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                                     <DatePicker
                                         label="Firmware Date"
+                                        disabled={!canUpdate}
                                         value={formData.wifiSpecs.firmwareDate || new Date()}
                                         onChange={(date) => handleSpecChange({ target: { value: date } }, 'wifiSpecs', 'firmwareDate')}
                                         renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
@@ -382,14 +445,15 @@ const DeviceDetails = () => {
                                 <InputLabel>{'Encryption'}</InputLabel>
                                 <Select
                                     label="Encryption"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.encryption}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'encryption')}
                                 >
-                                    <MenuItem value="Open">Open</MenuItem>
-                                    <MenuItem value="WEP">WEP</MenuItem>
-                                    <MenuItem value="WPA">WPA</MenuItem>
-                                    <MenuItem value="WPA2">WPA2</MenuItem>
-                                    <MenuItem value="WPA3">WPA3</MenuItem>
+                                    {
+                                        encryptionToSelect?.map((itemData) => (
+                                            <MenuItem key={itemData.value} value={itemData.value}>{itemData.displayValue}</MenuItem>
+
+                                        ))}
 
                                 </Select>
                                 {errors.wifiSpecs?.encryption && (
@@ -402,6 +466,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Standards"}</InputLabel>
                                 <Select
                                     label="Supported Standards"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.supportedStandards || []}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'supportedStandards')}
                                     multiple
@@ -424,6 +489,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Frequencies"}</InputLabel>
                                 <Select
                                     label="Supported Frequencies"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.supportedFrequencies || []}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'supportedFrequencies')}
                                     multiple
@@ -442,15 +508,16 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Utilized Standard"}</InputLabel>
                                 <Select
                                     label="Utilized Standard"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.standardUtilized || []}
                                     onChange={(e) => handleUtilizedStandardChange(e, 'wifiSpecs', 'standardUtilized')}
                                 >
-                                    <MenuItem value="_802_11a">802.11a</MenuItem>
-                                    <MenuItem value="_802_11b">802.11b</MenuItem>
-                                    <MenuItem value="_802_11g">802.11g</MenuItem>
-                                    <MenuItem value="_802_11n">802.11n</MenuItem>
-                                    <MenuItem value="_802_11ac">802.11ac</MenuItem>
-                                    <MenuItem value="_802_11ax">802.11ax</MenuItem>
+                                    {
+                                        formData.wifiSpecs.supportedStandards?.map((itemData) => (
+
+                                            <MenuItem key={itemData} value={itemData}>{itemData.slice(1).replace(/_/g, '.')}</MenuItem>
+
+                                        ))}
                                 </Select>
                                 {errors.wifiSpecs?.standardUtilized && (
                                     <FormHelperText sx={{ color: 'red' }}>{errors.wifiSpecs?.standardUtilized}</FormHelperText>
@@ -463,11 +530,12 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Utilized Frequencies"}</InputLabel>
                                 <Select
                                     label="Utilized Frequencies"
+                                    disabled={!canUpdate}
                                     value={formData.wifiSpecs.frequencyUtilized || []}
-                                    onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'frequencyUtilized')}
+                                    onChange={(e) => handleUtilizedFregChange(e, 'wifiSpecs', 'frequencyUtilized')}
                                 >
-                                 {
-                                frequenciesToSelect?.map((itemData) => (
+                                    {
+                                        frequenciesToSelect?.map((itemData) => (
                                             <MenuItem key={itemData.value} value={itemData.value}>{itemData.displayValue}</MenuItem>
 
                                         ))}
@@ -489,17 +557,8 @@ const DeviceDetails = () => {
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
                                 <TextField
-                                    label="Bandwidth"
-                                    type="number"
-                                    value={formData.gsmSpecs.bandwidth || ''}
-                                    onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'bandwidth')}
-                                />
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <TextField
                                     label="Firmware"
+                                    disabled={!canUpdate}
                                     value={formData.gsmSpecs.firmware || ''}
                                     onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'firmware')}
                                     error={!!errors.gsmSpecs?.firmware}
@@ -512,6 +571,7 @@ const DeviceDetails = () => {
                                 <TextField
                                     label="MacAdress"
                                     type="text"
+                                    disabled={!canUpdate}
                                     value={formData.gsmSpecs.macAddress || ''}
                                     onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'macAddress')}
                                     error={!!errors.gsmSpecs?.macAddress}
@@ -524,6 +584,7 @@ const DeviceDetails = () => {
                                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                                     <DatePicker
                                         label="Firmware Date"
+                                        disabled={!canUpdate}
                                         value={formData.gsmSpecs.firmwareDate || new Date()}
                                         onChange={(date) => handleSpecChange({ target: { value: date } }, 'gsmSpecs', 'firmwareDate')}
                                         renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
@@ -536,6 +597,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Generations"}</InputLabel>
                                 <Select
                                     label="Supported Generations"
+                                    disabled={!canUpdate}
                                     value={formData.gsmSpecs.supportedGenerations || []}
                                     onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'supportedGenerations')}
                                     multiple
@@ -546,6 +608,27 @@ const DeviceDetails = () => {
                                 </Select>
                                 {errors.gsmSpecs?.supportedGenerations && (
                                     <FormHelperText sx={{ color: 'red' }}>{errors.gsmSpecs?.supportedGenerations}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"Utilized Generations"}</InputLabel>
+                                <Select
+                                    label="Utilized Generations"
+                                    disabled={!canUpdate}
+                                    value={formData.gsmSpecs.utilizedGeneration || []}
+                                    onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'utilizedGeneration')}
+                                >
+                                    {
+                                        formData.gsmSpecs.supportedGenerations?.map((itemData) => (
+
+                                            <MenuItem key={itemData} value={itemData}>{gsmGenerationsMapping(itemData)}</MenuItem>
+
+                                        ))}
+                                </Select>
+                                {errors.gsmSpecs?.utilizedGeneration && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.gsmSpecs?.utilizedGeneration}</FormHelperText>
                                 )}
                             </FormControl>
                         </Grid>
@@ -561,17 +644,8 @@ const DeviceDetails = () => {
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
                                 <TextField
-                                    label="Bandwidth"
-                                    type="number"
-                                    value={formData.bluetoothSpecs.bandwidth || ''}
-                                    onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'bandwidth')}
-                                />
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <TextField
                                     label="Firmware"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.firmware || ''}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'firmware')}
                                     error={!!errors.bluetoothSpecs?.firmware}
@@ -584,6 +658,7 @@ const DeviceDetails = () => {
                                 <TextField
                                     label="MacAdress"
                                     type="text"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.macAddress || ''}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'macAddress')}
                                     error={!!errors.bluetoothSpecs?.macAddress}
@@ -596,6 +671,7 @@ const DeviceDetails = () => {
                                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                                     <DatePicker
                                         label="Firmware Date"
+                                        disabled={!canUpdate}
                                         value={formData.bluetoothSpecs.firmwareDate || new Date()}
                                         onChange={(date) => handleSpecChange({ target: { value: date } }, 'bluetoothSpecs', 'firmwareDate')}
                                         renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
@@ -608,6 +684,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Antenas"}</InputLabel>
                                 <Select
                                     label="Supported Antenas"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.supportedAntenas || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'supportedAntenas')}
                                     multiple
@@ -629,6 +706,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Authentication Methods"}</InputLabel>
                                 <Select
                                     label="Supported Authentication Methods"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.supportedAuthenticationMethods || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'supportedAuthenticationMethods')}
                                     multiple
@@ -649,6 +727,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Data Integrities"}</InputLabel>
                                 <Select
                                     label="Supported Data Integrities"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.supportedDataIntegrities || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'supportedDataIntegrities')}
                                     multiple
@@ -667,6 +746,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Topologies"}</InputLabel>
                                 <Select
                                     label="Supported Topologies"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.supportedTopologies || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'supportedTopologies')}
                                     multiple
@@ -685,6 +765,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported AccessControl Mechanisms"}</InputLabel>
                                 <Select
                                     label="Supported AccessControl Mechanisms"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.supportedAccessControlMechanisms || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'supportedAccessControlMechanisms')}
                                     multiple
@@ -702,6 +783,7 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Supported Versions"}</InputLabel>
                                 <Select
                                     label="Supported Versions"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.supportedVersions || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'supportedVersions')}
                                     multiple
@@ -713,7 +795,7 @@ const DeviceDetails = () => {
                                     <MenuItem value="5.1">v5.1</MenuItem>
                                     <MenuItem value="5.2">v5.2</MenuItem>
                                     <MenuItem value="5.3">v5.3</MenuItem>
-                                    <MenuItem value="5.4">v5.4</MenuItem> 
+                                    <MenuItem value="5.4">v5.4</MenuItem>
                                 </Select>
                                 {errors.bluetoothSpecs?.supportedVersions && (
                                     <FormHelperText sx={{ color: 'red' }}>{errors.bluetoothSpecs?.supportedVersions}</FormHelperText>
@@ -725,19 +807,165 @@ const DeviceDetails = () => {
                                 <InputLabel>{"Utilized Version"}</InputLabel>
                                 <Select
                                     label="Utilized Version"
+                                    disabled={!canUpdate}
                                     value={formData.bluetoothSpecs.utilizedVersion || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'utilizedVersion')}
                                 >
-                                        {
+                                    {
                                         formData.bluetoothSpecs.supportedVersions?.map((itemData) => (
 
-                                            <MenuItem value={itemData}>{"v"+itemData}</MenuItem>
+                                            <MenuItem key={itemData} value={itemData}>{"v" + itemData}</MenuItem>
 
-                                        ))}   
+                                        ))}
                                 </Select>
                                 {errors.bluetoothSpecs?.utilizedVersion && (
                                     <FormHelperText sx={{ color: 'red' }}>{errors.bluetoothSpecs?.utilizedVersion}</FormHelperText>
                                 )}
+                            </FormControl>
+                        </Grid>
+                    </>
+                )}
+                {formData.supportedCommunicationProtocols?.includes('LoraWan') && (
+                    <>
+                        <Grid item xs={12}>
+                            <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
+                                <Typography variant="h6">{'LoraWan'}</Typography>
+                            </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <TextField
+                                    label="Firmware"
+                                    type="text"
+                                    disabled={!canUpdate}
+                                    value={formData.lorawanSpecs.firmware || ''}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'firmware')}
+                                    error={!!errors.lorawanSpecs?.firmware}
+                                    helperText={errors.lorawanSpecs?.firmware ?? ''}
+                                />
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <TextField
+                                    label="MacAdress"
+                                    type="text"
+                                    disabled={!canUpdate}
+                                    value={formData.lorawanSpecs.macAddress || ''}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'macAddress')}
+                                    error={!!errors.lorawanSpecs?.macAddress}
+                                    helperText={errors.lorawanSpecs?.macAddress ?? ''}
+                                />
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DatePicker
+                                        label="Firmware Date"
+                                        disabled={!canUpdate}
+                                        value={formData.lorawanSpecs.firmwareDate || new Date()}
+                                        onChange={(date) => handleSpecChange({ target: { value: date } }, 'lorawanSpecs', 'firmwareDate')}
+                                        renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
+                                    />
+                                </LocalizationProvider>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"Supported Frequency Bands"}</InputLabel>
+                                <Select
+                                    label="Supported Frequency Bands"
+                                    disabled={!canUpdate}
+                                    value={formData.lorawanSpecs.supportedFrequencyBands || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'supportedFrequencyBands')}
+                                    multiple
+                                >
+                                    <MenuItem value="EU868">EU868</MenuItem>
+                                    <MenuItem value="US915">US915</MenuItem>
+                                    <MenuItem value="AS923">AS923</MenuItem>
+                                    <MenuItem value="AU915">AU915</MenuItem>
+                                    <MenuItem value="CN470">CN470</MenuItem>
+                                    <MenuItem value="KR920">KR920</MenuItem>
+                                    <MenuItem value="IN865">IN865</MenuItem>
+                                    <MenuItem value="RU864">RU864</MenuItem>
+                                    <MenuItem value="RU868">RU868</MenuItem>
+
+                                </Select>
+                                {errors.lorawanSpecs?.supportedFrequencyBands && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.supportedFrequencyBands}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"Utilized Frequency Bands"}</InputLabel>
+                                <Select
+                                    label="Utilized Frequency Bands"
+                                    disabled={!canUpdate}
+                                    value={formData.lorawanSpecs.utilizedFrequencyBand || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'utilizedFrequencyBand')}
+                                >
+                                    {
+                                        formData.lorawanSpecs.supportedFrequencyBands?.map((itemData) => (
+
+                                            <MenuItem key={itemData} value={itemData}>{itemData}</MenuItem>
+
+                                        ))}
+                                </Select>
+                                {errors.lorawanSpecs?.utilizedFrequencyBand && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.utilizedFrequencyBand}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"JoinMode"}</InputLabel>
+                                <Select
+                                    label="Join Mode"
+                                    disabled={!canUpdate}
+                                    value={formData.lorawanSpecs.joinMode || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'joinMode')}
+                                >
+                                    <MenuItem value="ABP">ABP</MenuItem>
+                                    <MenuItem value="OTAA">OTAA</MenuItem>
+                                </Select>
+                                {errors.lorawanSpecs?.supportedStandards && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.joinMode}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"PhysicalLocation"}</InputLabel>
+                                <Select
+                                    label="Physical Location"
+                                    disabled={!canUpdate}
+                                    value={formData.lorawanSpecs.physicalLocation || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'physicalLocation')}
+                                >
+                                    <MenuItem value="OpenSpace">OpenSpace</MenuItem>
+                                    <MenuItem value="PrivatePlace">PrivatePlace</MenuItem>
+                                    <MenuItem value="SecurePlace">SecurePlace</MenuItem>
+                                </Select>
+                                {errors.lorawanSpecs?.physicalLocation && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.physicalLocation}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            inputProps={{'aria-label': 'Adaptive Data Rate'}}
+                                            name='lorawanSpecs.adaptiveDataRate'
+                                            checked={formData.lorawanSpecs.adaptiveDataRate}
+                                            onChange={handleCheckboxChange}
+                                        />
+                                    }
+                                    label={'Adaptive Data Rate'}
+                                />
                             </FormControl>
                         </Grid>
                     </>
@@ -779,6 +1007,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="Name"
+                                                    disabled={!canUpdate}
                                                     value={formData.name}
                                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                     error={!!errors.name}
@@ -790,6 +1019,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="Serial Number"
+                                                    disabled={!canUpdate}
                                                     value={formData.serialNumber}
                                                     error={!!errors.serialNumber}
                                                     helperText={errors.serialNumber ?? ''}
@@ -801,6 +1031,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="Type"
+                                                    disabled={!canUpdate}
                                                     value={formData.type}
                                                     error={!!errors.type}
                                                     helperText={errors.type ?? ''}
@@ -812,6 +1043,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="DoctorId"
+                                                    disabled={!canUpdate}
                                                     value={formData.doctorId}
                                                     error={!!errors.doctorId}
                                                     helperText={errors.doctorId ?? ''}
@@ -824,6 +1056,7 @@ const DeviceDetails = () => {
                                                 <InputLabel>{'Communication Protocol'}</InputLabel>
                                                 <Select
                                                     onChange={handleProtocolUtilizedChange}
+                                                    disabled={!canUpdate}
                                                     label={'Communication Protocol'}
                                                     value={formData.communicationProtocol}
                                                 >
@@ -843,6 +1076,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="Manufacturer"
+                                                    disabled={!canUpdate}
                                                     value={formData.manufacturer}
                                                     error={!!errors.manufacturer}
                                                     helperText={errors.manufacturer ?? ''}
@@ -854,6 +1088,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="Description"
+                                                    disabled={!canUpdate}
                                                     value={formData.description}
                                                     error={!!errors.description}
                                                     helperText={errors.description ?? ''}
@@ -866,6 +1101,7 @@ const DeviceDetails = () => {
                                                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                                                     <DatePicker
                                                         label="Manufacturing Date"
+                                                        disabled={!canUpdate}
                                                         value={formData.manufacturingDate}
                                                         onChange={handleDateChange}
                                                         renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
@@ -877,6 +1113,7 @@ const DeviceDetails = () => {
                                             <FormControl fullWidth margin="normal">
                                                 <TextField
                                                     label="Network Name"
+                                                    disabled={!canUpdate}
                                                     value={formData.networkName}
                                                     error={!!errors.networkName}
                                                     helperText={errors.networkName ?? ''}
@@ -886,20 +1123,10 @@ const DeviceDetails = () => {
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
                                             <FormControl fullWidth margin="normal">
-                                                <TextField
-                                                    label="Network Identifier"
-                                                    value={formData.networkIdentifier}
-                                                    error={!!errors.networkIdentifier}
-                                                    helperText={errors.networkIdentifier ?? ''}
-                                                    onChange={(e) => setFormData({ ...formData, networkIdentifier: e.target.value })}
-                                                />
-                                            </FormControl>
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <FormControl fullWidth margin="normal">
                                                 <InputLabel>{'Location'}</InputLabel>
                                                 <Select
                                                     label="Location"
+                                                    disabled={!canUpdate}
                                                     name='location'
                                                     value={formData.location}
                                                     onChange={handleInputChange}
@@ -914,16 +1141,6 @@ const DeviceDetails = () => {
                                             </FormControl>
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <FormControl fullWidth margin="normal">
-                                                <TextField
-                                                    label="Battery Status"
-                                                    type='numeric'
-                                                    value={formData.batteryStatus}
-                                                    onChange={(e) => setFormData({ ...formData, batteryStatus: e.target.value })}
-                                                />
-                                            </FormControl>
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
                                             <FormControl fullWidth>
                                                 <FormControlLabel
                                                     control={
@@ -932,6 +1149,7 @@ const DeviceDetails = () => {
                                                         />
                                                     }
                                                     label={'Validated'}
+                                                    disabled={!canUpdate}
                                                     checked={formData.validated}
                                                     onChange={(e) => setFormData({ ...formData, validated: e.target.checked })}
                                                 />
@@ -945,6 +1163,7 @@ const DeviceDetails = () => {
                                                         control={
                                                             <Checkbox
                                                                 checked={formData.supportedCommunicationProtocols?.includes('WiFi')}
+                                                                disabled={!canUpdate}
                                                                 onChange={handleProtocolChange}
                                                                 name="WiFi"
                                                             />
@@ -955,6 +1174,7 @@ const DeviceDetails = () => {
                                                         control={
                                                             <Checkbox
                                                                 checked={formData.supportedCommunicationProtocols?.includes('Bluetooth')}
+                                                                disabled={!canUpdate}
                                                                 onChange={handleProtocolChange}
                                                                 name="Bluetooth"
                                                             />
@@ -965,20 +1185,34 @@ const DeviceDetails = () => {
                                                         control={
                                                             <Checkbox
                                                                 checked={formData.supportedCommunicationProtocols?.includes('GSM')}
+                                                                disabled={!canUpdate}
                                                                 onChange={handleProtocolChange}
                                                                 name="GSM"
                                                             />
                                                         }
                                                         label="GSM"
                                                     />
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                checked={formData.supportedCommunicationProtocols?.includes('LoraWan')}
+                                                                disabled={!canUpdate}
+                                                                onChange={handleProtocolChange}
+                                                                name="LoraWan"
+                                                            />
+                                                        }
+                                                        label="LoraWan"
+                                                    />
                                                     {/* Add more protocols as needed */}
                                                 </Box>
                                             </FormControl>
                                         </Grid>
                                         {renderProtocolFields()}
-                                        <Grid item xs={12}>
-                                            <Button type="submit" variant="outlined" style={{ color: 'black', borderColor: 'black', width: '10%', height: '10px' }} >Update</Button>
-                                        </Grid>
+                                        {canUpdate && (
+                                            <Grid item xs={12}>
+                                                <Button type="submit" variant="outlined" style={{ color: 'black', borderColor: 'black', width: '10%', height: '10px' }} >Update</Button>
+                                            </Grid>
+                                        )}
                                     </Grid>
                                 </form>
                             </MDBox>

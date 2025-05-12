@@ -7,11 +7,14 @@ public class WifiNetworkDetails
 {
     public WifiDeploymentDetails WifiDeploymentDetails { get; set; }
     public List<NetworkFailure> NetworkFailures { get; set; }
+    public int OtherConnectedDevices { get; set; }
 }
 
 public class WifiDeploymentDetails
 {
     public List<AccessPoint> AccessPoints { get; set; }
+    public WifiTopologyType TopologyType { get; set; }
+    public int LifetimeInYears { get; set; }
 }
 
 public class AccessPoint

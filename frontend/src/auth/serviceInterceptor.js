@@ -1,56 +1,30 @@
-import { useContext } from 'react';
-import { AuthContext } from './AuthContext'; // Adjust path as needed
+import React, { useContext } from 'react';
+import { KeycloakContext } from '../keycloak-provider';
 
 export const useApiRequest = () => {
 
-
-    const { getAuthHeaders, refreshToken, logout } = useContext(AuthContext);
+    const { getAuthHeaders } = useContext(KeycloakContext);
 
     const apiRequest = async (url, options) => {
 
         console.log("try to request" , url);
+
+        var authHeaders = await getAuthHeaders();
 
         try {
             let response = await fetch(url, {
                 ...options,
                 headers: {
                     ...options.headers,
-                    ...getAuthHeaders(),
+                    ...authHeaders,
                 },
             });
 
             console.log("Response status:" , response.status);
 
-            if (response.status === 401) {
-                // Try to refresh token
-                const tokenRefreshed = await refreshToken();
-                if (tokenRefreshed) {
-
-                    console.log("Token Refreshed");
-
-                    // Retry the original request with the new token
-                    response = await fetch(url, {
-                        ...options,
-                        headers: {
-                            ...options.headers,
-                            ...getAuthHeaders(),
-                        },
-                    });
-
-                    console.log("New Response", response);
-
-
-                } else {
-
-                    console.log("Not refreshed. Go to logout");
-
-                    // Redirect to login if refresh fails
-                    logout();
-                    return;
-                }
-            }
 
             if (!response.ok) {
+
                 throw new Error(`Error: ${response.status}`);
             }
 

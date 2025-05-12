@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MediatR;
 using MedSecurance.ActivityLog.Models;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
+using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Commands.Gsm;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
@@ -29,7 +30,7 @@ public class EvaluateGsmCommandHandler(
         // Retrieve the userId of the user that called the API
         var userId = Guid.Parse(httpContextAccessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-        var evaluatorResult = gsmEvaluator.Evaluate(request);
+        var evaluatorResult = await gsmEvaluator.Evaluate(request);
 
         var isValidGuid = Guid.TryParse(request.RiskAssessmentId, out var riskAssessmentId);
 
@@ -48,11 +49,16 @@ public class EvaluateGsmCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLog.Models.Enums.ActivityLogCategory.RiskAssessment,
             Action = ActivityLog.Models.Enums.ActivityLogAction.Execute,
             Details = $"{nameof(EvaluateGsmCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
 
-        return new EvaluateCommandResponse(evaluatorResult.Result.Suggestions);
+        return new EvaluateCommandResponse(
+            evaluatorResult.Mitigations,
+            evaluatorResult.SafeConfigs,
+            evaluatorResult.Replacements
+        );
     }
 }

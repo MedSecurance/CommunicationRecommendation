@@ -13,6 +13,7 @@ public record EvaluateGsmCommand(
     bool AlreadyImplemented,
     bool LogMonitoringEnabled,
     bool RedundancyMeasures,
+    bool FirmwareIntegrityCheck,
     bool IntrusionDetectionSystem,
     int LifetimeInYears,
     DataPrivacyMeasures DataPrivacyMeasures,

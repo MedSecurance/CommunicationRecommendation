@@ -10,7 +10,7 @@ const mapBluetoothMapperApiData = (bluetoothData) => {
         redundancyMeasures: bluetoothData.redundancy_measures,
         intrusionDetectionSystem: bluetoothData.intrusion_detection_system,
         firmwareIntegrityCheck: bluetoothData.firmware_integrity_check,
-        dataPrivacyMeasures: { atRest: true, inTransit: true },
+        dataPrivacyMeasures: { atRest: bluetoothData.at_rest, inTransit: bluetoothData.in_transit },
         securityAuditFrequencyInYears: bluetoothData.security_audit_frequency_in_years,
         accessControlMechanism: bluetoothData.access_control_mechanism,
         backboneNetworkSpeedInMpbs: bluetoothData.backbone_network_speed_in_mpbs,
@@ -28,7 +28,7 @@ const mapBluetoothMapperApiData = (bluetoothData) => {
                 ]
             },
             networkFailures: [],
-            otherConnectedDevices: 0
+            otherConnectedDevices: bluetoothData.mesh_details.other_connected_devices ?? 0
         }
     }
 

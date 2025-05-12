@@ -7,7 +7,7 @@ public class WifiConfig
 {
     public List<WifiPlacement> Placement { get; set; }
     public List<string> ApPhysicalLocation { get; set; }
-    public List<string> TopologyType { get; set; }
+    public List<WifiTopologyType> TopologyType { get; set; }
     public int FirmwareUpgradeThreshold { get; set; }
     public int LifetimeInYears { get; set; }
     public Dictionary<WifiStandardType, Standard> Standards { get; set; }
@@ -29,17 +29,12 @@ public class OperationFrequency
     public Dictionary<WifiEncyptionType, Encryption> Encryption { get; set; }
 }
 
-public partial class Encryption
+public class Encryption
 {
-    public Dictionary<WifiAlgorithmType, Algorithm> Algorithm { get; set; }
-}
-
-public class Algorithm
-{
-    public Dictionary<string, KeyLength> KeyLength { get; set; }
+    public Dictionary<WifiAlgorithmType, KeyLength> Algorithm { get; set; }
 }
 
 public class KeyLength
 {
-    public string KeyLengthInBits { get; set; }
+    public List<string> KeyLengthInBits { get; set; } = [];
 }

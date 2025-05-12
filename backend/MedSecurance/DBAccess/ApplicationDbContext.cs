@@ -3,14 +3,12 @@ using MedSecurance.DeviceManager.Models;
 using MedSecurance.ProtocolEvaluator.Configuration;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
 using MedSecurance.ProtocolEvaluator.Models.RiskAssessment;
-using MedSecurance.UserManager.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace MedSecurance.DBAccess;
 
-public class ApplicationDbContext : IdentityDbContext<User>
+public class ApplicationDbContext : DbContext
 {
     private readonly IConfiguration _configuration;
 
@@ -42,43 +40,9 @@ public class ApplicationDbContext : IdentityDbContext<User>
 
         base.OnModelCreating(modelBuilder);
 
-        Task.Run(async () => await Seed(modelBuilder)).Wait();
         Task.Run(async () => await SeedAdminConfig(modelBuilder)).Wait();
     }
-
-    private Task Seed(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<IdentityRole>().HasData(new IdentityRole
-        {
-            Id = "44f1e544-9500-42e6-bcf6-c74f5cace999",
-            Name = "PlatformAdmin",
-            NormalizedName = "PlatformAdmin".ToUpperInvariant()
-        });
-
-        modelBuilder.Entity<IdentityRole>().HasData(new IdentityRole
-        {
-            Id = "998643fa-d5e2-4dff-9684-2c1ef30ce818",
-            Name = "HardwareAdmin",
-            NormalizedName = "HardwareAdmin".ToUpperInvariant()
-        });
-
-        modelBuilder.Entity<IdentityRole>().HasData(new IdentityRole
-        {
-            Id = "d38867b1-0543-4c44-ba92-1a65c4f8bc18",
-            Name = "SecurityAnalyst",
-            NormalizedName = "SecurityAnalyst".ToUpperInvariant()
-        });
-
-        modelBuilder.Entity<IdentityRole>().HasData(new IdentityRole
-        {
-            Id = "3c07ef7e-af20-46e7-8487-e7822512392b",
-            Name = "RegulatoryBody",
-            NormalizedName = "RegulatoryBody".ToUpperInvariant()
-        });
-
-        return Task.CompletedTask;
-    }
-
+    
     private Task SeedAdminConfig(ModelBuilder modelBuilder)
     {
         foreach (var protocol in Enum.GetValues(typeof(Protocol)).Cast<Protocol>())

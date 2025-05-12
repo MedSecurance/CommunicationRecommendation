@@ -163,7 +163,8 @@ export const FourTwo = ({ updateStandartData, handleClose }) => {
     const [prodocolData, setProdocolData] = useState({
         standar_name: '4.2',
         channelBand: '1 MHz',
-        data_rate_in_Mbps: '1 Mbps'
+        data_rate_in_Mbps: '1 Mbps',
+        isDefault: false
     });
 
     return (
@@ -233,7 +234,8 @@ export const FiveZero = ({ updateStandartData, handleClose }) => {
     const [prodocolData, setProdocolData] = useState({
         standar_name: '5.0',
         channelBand: '2 MHz',
-        data_rate_in_Mbps: '2 Mbps'
+        data_rate_in_Mbps: '2 Mbps',
+        isDefault: false
     });
 
 
@@ -301,7 +303,8 @@ export const FiveOne = ({ updateStandartData, handleClose }) => {
     const [prodocolData, setProdocolData] = useState({
         standar_name: '5.1',
         channelBand: '2 MHz',
-        data_rate_in_Mbps: '2 Mbps'
+        data_rate_in_Mbps: '2 Mbps',
+        isDefault: false
     });
 
     return (
@@ -368,7 +371,8 @@ export const FiveTwo = ({ updateStandartData, handleClose }) => {
     const [prodocolData, setProdocolData] = useState({
         standar_name: '5.2',
         channelBand: '2 MHz',
-        data_rate_in_Mbps: '2 Mbps'
+        data_rate_in_Mbps: '2 Mbps',
+        isDefault: false
     });
 
     return (
@@ -396,7 +400,6 @@ export const FiveTwo = ({ updateStandartData, handleClose }) => {
                     />
                 </FormControl>
             </Grid>
-
             <Grid item xs={6} sm={3}>
                 <Button
                     variant="outlined"
@@ -437,7 +440,8 @@ export const FiveThree = ({ updateStandartData, handleClose }) => {
     const [prodocolData, setProdocolData] = useState({
         standar_name: '5.3',
         channelBand: '2 MHz',
-        data_rate_in_Mbps: '2 Mbps'
+        data_rate_in_Mbps: '2 Mbps',
+        isDefault: false
     });
 
     return (
@@ -506,7 +510,8 @@ export const FiveFour = ({ updateStandartData, handleClose }) => {
     const [prodocolData, setProdocolData] = useState({
         standar_name: '5.4',
         channelBand: '2 MHz',
-        data_rate_in_Mbps: '2 Mbps'
+        data_rate_in_Mbps: '2 Mbps',
+        isDefault: false
     });
 
     return (

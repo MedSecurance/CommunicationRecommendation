@@ -1,15 +1,15 @@
-import { useContext } from 'react';
-import { AuthContext } from '../auth/AuthContext';
-
 const API_BASE_URL = process.env.REACT_APP_BASE_URL || "http://localhost:5287";
 
 export const GetDevices = async (getAuthHeaders) => {
-  try {
+  try {    
+   
+    var authHeaders = await getAuthHeaders();
+   
     const response = await fetch(`${API_BASE_URL}/device-manager/devices`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     });
 
@@ -27,12 +27,14 @@ export const GetDevices = async (getAuthHeaders) => {
 
 export const AddDevice = async (device, getAuthHeaders) => {
   try {
-    debugger;
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/device-manager/devices`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
       body: JSON.stringify(device), // Include device data in the request body
     });
@@ -51,11 +53,14 @@ export const AddDevice = async (device, getAuthHeaders) => {
 
 export const DeleteDevice = async (deviceId, getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/device-manager/devices/${deviceId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     });
 
@@ -70,11 +75,13 @@ export const DeleteDevice = async (deviceId, getAuthHeaders) => {
 
 export const GetDeviceDetails = async (deviceId, getAuthHeaders) => {
   try {
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/device-manager/devices/${deviceId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     });
 
@@ -92,11 +99,14 @@ export const GetDeviceDetails = async (deviceId, getAuthHeaders) => {
 
 export const UpdateDevice = async (device, deviceId, getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/device-manager/devices/${deviceId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
       body: JSON.stringify(device), // Include device data in the request body
     });

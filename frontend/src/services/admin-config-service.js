@@ -1,15 +1,15 @@
-import { useContext } from 'react';
-import { AuthContext } from '../auth/AuthContext';
-
 const API_BASE_URL = process.env.REACT_APP_BASE_URL || "http://localhost:5287";
 
 export const GetAdminConfigs = async (getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/admin-config`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     });
 
@@ -27,11 +27,14 @@ export const GetAdminConfigs = async (getAuthHeaders) => {
 
 export const UpdateAdminConfig = async (updatedAdminConfig, getAuthHeaders) => {
   try {
+
+    var authHeaders = await getAuthHeaders();
+
     const response = await fetch(`${API_BASE_URL}/protocol-evaluator/admin-config`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
       body: JSON.stringify(updatedAdminConfig),
     });

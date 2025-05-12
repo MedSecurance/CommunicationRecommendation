@@ -67,13 +67,13 @@ const FrequencyBandModal = ({ open, handleClose, updateStandartData, standards, 
             case 'US915':
                 return (<US915 updateStandartData={updateStandartData} handleClose={handleClose} />)
             case 'AS923':
-                return (<AS923 updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
+                return (<AS923 updateStandartData={updateStandartData} handleClose={handleClose} />)
             case 'AU915':
-                return (<AU915 updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
+                return (<AU915 updateStandartData={updateStandartData} handleClose={handleClose} />)
             case 'CN470':
-                return (<CN470 updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
+                return (<CN470 updateStandartData={updateStandartData} handleClose={handleClose} />)
             case 'KR920':
-                return (<KR920 updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
+                return (<KR920 updateStandartData={updateStandartData} handleClose={handleClose} />)
             default:
                 return (''
                 );

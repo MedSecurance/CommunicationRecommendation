@@ -2,5 +2,7 @@
 
 public class EvaluationResult
 {
-    public ICollection<string> Suggestions { get; init; } = new List<string>();
+    public ICollection<EvaluationSuggestion> Mitigations { get; init; } = new List<EvaluationSuggestion>();
+    public ICollection<EvaluationSuggestion> SafeConfigs { get; init; } = new List<EvaluationSuggestion>();
+    public ProtocolReplacementEvaluationResult Replacements { get; init; } = new();
 }

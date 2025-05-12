@@ -2,11 +2,11 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   Button, Select, MenuItem, FormControl, InputLabel, Box, Stepper, Step, StepLabel,
   Grid, Card, CircularProgress, Typography, IconButton, Snackbar, Alert, Dialog,
-  DialogActions, DialogContent, DialogContentText, DialogTitle
+  DialogActions, DialogContent, DialogContentText, DialogTitle, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
@@ -30,8 +30,9 @@ import bluetoothValidations from '../riskassesment/protocols/bluetooth/bluetooth
 import loraWanValidations from '../riskassesment/protocols/lorawan/lorawan-validations.js'
 import gsmValidations from '../riskassesment/protocols/gsm/gsm-validations.js'
 import wifiValidations from '../riskassesment/protocols/wifi/wifi-validations.js'
-import { AuthContext } from '../../auth/AuthContext'; // Assuming you have an AuthContext for managing authentication
 import { useApiRequest } from '../../auth/serviceInterceptor'; // Assuming you have an AuthContext for managing authentication
+import { KeycloakContext } from '../../keycloak-provider';
+import { hasPermission } from '../../authentication-helpers/role-validator';
 
 
 //DataTable
@@ -39,8 +40,7 @@ import DataTable from "examples/Tables/DataTable";
 import Icon from "@mui/material/Icon";
 
 const RiskAssessment = () => {
-
-  const { getAuthHeaders } = useContext(AuthContext);
+  const { getAuthHeaders, roles } = useContext(KeycloakContext);
   const { apiRequest } = useApiRequest();
 
   const [activeStep, setActiveStep] = useState(0);
@@ -59,6 +59,34 @@ const RiskAssessment = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [riskAssessmentIdToDelete, setRiskAssessmentIdToDelete] = useState(null);
 
+  const canDelete = hasPermission(roles, 'RiskAssessment', 'delete');
+  const canViewDetails = hasPermission(roles, 'RiskAssessment', 'view');
+  const canInsert = hasPermission(roles, 'RiskAssessment', 'insert');
+
+  const sortByWeight = (array) => array.sort((a, b) => b.weight - a.weight);
+  const sortBySeverity = (array) => array.sort((a, b) => b.severity - a.severity);
+
+  const [silentExecute, setSilentExecute] = useState(false);
+
+  const weightColors = {
+    5: '#ff0000',
+    4: '#bf3284',
+    3: '#e97132',
+    2: '#b6c276',
+    1: '#32c22b',
+  };
+
+  const getWeight = (item) => {
+    if (item.weight !== undefined) return item.weight;
+    if (item.severity !== undefined) {
+      if (item.severity >= 9) return 5;
+      if (item.severity === 8) return 4;
+      if (item.severity === 7) return 3;
+      if (item.severity === 6) return 2;
+      if (item.severity === 5) return 1;
+    }
+    return undefined; // fallback
+  };
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
@@ -87,6 +115,12 @@ const RiskAssessment = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (silentExecute) {
+      handleNext();
+    }
+  }, [silentExecute]);
+
   const fetchData = async () => {
     try {
       const response = await getRiskAssessments(apiRequest);
@@ -113,11 +147,18 @@ const RiskAssessment = () => {
           </Typography>
         ),
         action: (
-          <><MDTypography onClick={() => HandleShowDetails(riskAssessment.id)} component="a" href="#" color="text">
-            <Icon>info</Icon>
-          </MDTypography><MDTypography onClick={() => openDeleteDialog(riskAssessment.id)} component="a" href="#" color="text">
-              <Icon>delete</Icon>
-            </MDTypography></>
+          <>
+            {canViewDetails && (
+              <MDTypography onClick={() => HandleShowDetails(riskAssessment.id, canInsert)} component="a" href="#" color="text">
+                <Icon>info</Icon>
+              </MDTypography>
+            )}
+            {canDelete && (
+              <MDTypography onClick={() => openDeleteDialog(riskAssessment.id)} component="a" href="#" color="text">
+                <Icon>delete</Icon>
+              </MDTypography>
+            )}
+          </>
         )
 
       })));
@@ -126,28 +167,28 @@ const RiskAssessment = () => {
     }
   };
 
-    // Render the delete confirmation dialog
-    const renderDeleteDialog = () => (
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={closeDeleteDialog}
-      >
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this risk assessment? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDeleteDialog} color="primary">
-            Cancel
-          </Button>
-          <Button onClick={confirmDelete} color="secondary" autoFocus>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
+  // Render the delete confirmation dialog
+  const renderDeleteDialog = () => (
+    <Dialog
+      open={deleteDialogOpen}
+      onClose={closeDeleteDialog}
+    >
+      <DialogTitle>Confirm Deletion</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Are you sure you want to delete this risk assessment? This action cannot be undone.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={closeDeleteDialog} color="primary">
+          Cancel
+        </Button>
+        <Button onClick={confirmDelete} color="secondary" autoFocus>
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   const handleNext = async () => {
     if (!protocolValue) {
@@ -208,6 +249,8 @@ const RiskAssessment = () => {
     } else {
       setActiveStep((prev) => prev + 1);
     }
+
+    setSilentExecute(false);
   };
 
   const openDeleteDialog = (riskAssessmentId) => {
@@ -279,7 +322,7 @@ const RiskAssessment = () => {
         try {
           const parsedData = JSON.parse(reader.result);
           setProtocolData(parsedData);
-          setProtocolValue(parsedData.protocol);
+          setProtocolValue(parsedData.protocol.toLowerCase());
           setShowRiskAssesment(true);
           console.log('Parsed JSON data:', parsedData);
         } catch (error) {
@@ -357,48 +400,55 @@ const RiskAssessment = () => {
                         </Box>
                       ) : (
                         <Box>
-                          {Object.keys(result.suggestions).length === 0 ? (
-                            <Box sx={{ textAlign: 'center', p: 4 }}>
-                              <CheckCircleIcon sx={{ fontSize: '120px !important', color: 'green' }} />
-                              <MDTypography variant="h4" sx={{ mt: 2 }}>Success</MDTypography>
-                              <MDTypography>Your assessment was successfully completed.</MDTypography>
-                            </Box>
-                          ) : (
-                            <Box>
-                              <Box sx={{ textAlign: 'center' }}>
-                                <MDTypography variant="h4">Results</MDTypography>
-                              </Box>
-                              <Grid container spacing={2}>
-                                <Grid item xs={12}>
-                                  <MDBox p={2}>
-                                    {result.suggestions && result.suggestions.map((suggestion, index) => (
-                                      <MDTypography variant="h6" key={index} style={{ color: colors[index % colors.length], marginBottom: '8px' }}>
-                                        {suggestion}
-                                      </MDTypography>
-                                    ))}
-                                  </MDBox>
-                                </Grid>
-                              </Grid>
+                          <Typography variant="h4" align="center" sx={{ mb: 2 }}>
+                            Results
+                          </Typography>
+
+                          {[{ title: "Mitigations", data: sortByWeight(result.mitigations) },
+                          { title: "Safe Configurations", data: sortByWeight(result.safeConfigs) },
+                          { title: "Protocol Replacements", data: result.replacements.suggestions ? sortByWeight(result.replacements.suggestions) : [] },
+                          { title: "Vulnerabilities", data: result.vulnerabilities ? sortBySeverity(result.vulnerabilities) : [] }
+                          ].map((section, index) => (
+                            <Accordion key={index} defaultExpanded>
+                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Typography variant="h5">{section.title}</Typography>
+                              </AccordionSummary>
+                              <AccordionDetails>
+                                {section.data.length > 0 ? (
+                                  section.data.map((item, idx) => (
+                                    <MDTypography
+                                      variant="h6"
+                                      key={idx}
+                                      style={{ color: weightColors[getWeight(item)] || '#000', marginBottom: '8px' }}
+                                    >
+                                      <strong> ({item.weight || item.severity}) </strong>
+                                      {item.host ? " Host :" + item.host + " - " : " "}
+                                      {item.message || item.text}
+                                    </MDTypography>
+
+                                  ))
+                                ) : (
+                                  <Typography variant="body2" color="textSecondary">
+                                    No {section.title.toLowerCase()} available.
+                                  </Typography>
+                                )}
+                              </AccordionDetails>
+                            </Accordion>
+                          ))}
+
+                          {canInsert && (
+                            <Box sx={{ display: "flex", flexDirection: "row", pt: 2, justifyContent: "space-between" }}>
+                              <Button color="inherit" onClick={handleBack} sx={{ mr: 1 }}>
+                                Back
+                              </Button>
+                              <Box sx={{ flex: "1 1 auto" }} />
+                              <Button color="inherit" onClick={HandleDownloadResultsAndAnswers} sx={{ mr: 1 }}>
+                                Download Answers
+                              </Button>
                             </Box>
                           )}
-                          <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2, justifyContent: 'space-between' }}>
-                            <Button
-                              color="inherit"
-                              onClick={handleBack}
-                              sx={{ mr: 1 }}
-                            >
-                              Back
-                            </Button>
-                            <Box sx={{ flex: '1 1 auto' }} />
-                            <Button
-                              color="inherit"
-                              onClick={HandleDownloadResultsAndAnswers}
-                              sx={{ mr: 1 }}
-                              style={{ alignSelf: 'flex-end' }} // Align the download button to the right
-                            >
-                              Download Answers
-                            </Button>
-                          </Box>
+
+
                         </Box>
                       )
                     ) : (
@@ -452,7 +502,7 @@ const RiskAssessment = () => {
     setShowRiskAssesment(true);
   }
 
-  const HandleShowDetails = async (riskAssessmentId) => {
+  const HandleShowDetails = async (riskAssessmentId, canInsert) => {
 
     const data = await getRiskAssessmentById(riskAssessmentId, getAuthHeaders);
     const protocolDataResponse = JSON.parse(data.riskAssessment.body)
@@ -460,6 +510,10 @@ const RiskAssessment = () => {
     setShowRiskAssesment(true);
     setProtocolValue(data.riskAssessment.protocol.toLowerCase())
     setProtocolData(protocolDataResponse);
+
+    if (!canInsert) {
+      setSilentExecute(true);
+    }
 
   };
 
@@ -517,9 +571,11 @@ const RiskAssessment = () => {
                 showTotalEntries={true}
                 noEndBorder
               />
-              <Grid item xs={12} sm={6}>
-                <Button onClick={() => openRiskAssessment()} variant="outlined" style={{ color: 'black', borderColor: 'black', height: '10px' }} >Execute New Risk Assessment</Button>
-              </Grid>
+              {canInsert && (
+                <Grid item xs={12} sm={6}>
+                  <Button onClick={() => openRiskAssessment()} variant="outlined" style={{ color: 'black', borderColor: 'black', height: '10px' }} >New Risk Assessment</Button>
+                </Grid>
+              )}
             </MDBox>
           </Card>
         </Grid>

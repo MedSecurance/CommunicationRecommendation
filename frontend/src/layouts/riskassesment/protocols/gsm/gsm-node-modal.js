@@ -1,23 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import {
-    Button, Select,
-    MenuItem, FormControl, InputLabel, TextField,
-    Checkbox, FormControlLabel,
+    Button,
+    FormControl, TextField,
+    Checkbox,
     Dialog, DialogActions, DialogContent, DialogTitle,
-    Grid, IconButton, Snackbar, Alert, FormHelperText
+    Grid, IconButton, Snackbar, Alert, FormHelperText, Box ,Typography
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { v4 as uuidv4 } from 'uuid'; // Import the v4 function from uuid
 
 
-import { ThreeG, FourG, FiveG } from './standarts';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+import CloseIcon from '@mui/icons-material/Close';
+import AddStandardModal from './add-standard-modal';
 
 const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPointByUUID }) => {
+
+    const allStandarts = ['3G', '4G', '5G'];
 
     const [standardValue, setStandartValue] = useState('');
     const [standarts, setStandartSelections] = useState([]);
     const [defaultStandardIndex, setDefaultStandardIndex] = useState(-1);
+    
+    const [activeAccessModalData, setActiveAccessModalData] = useState({});
+    const [standartsState, setStandartsState] = useState([]);
 
     // Validation state section
     const [errors, setErrors] = useState({});
@@ -58,6 +64,18 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
             isEditable: hubData.isEditable ?? false,
             id: hubData.id ?? ''
         });
+
+        setStandartsState(allStandarts);
+
+        if (hubData.id &&
+            hubData.standardsDataList?.length > 0) {
+            hubData.standardsDataList.forEach(standardValue => {
+
+                setStandartsState(prevState => prevState.filter(standard => standard !== standardValue.standar_name));
+
+            });
+        }
+
     }, [open]);
 
     const updateStandartData = (updatedStandartData) => {
@@ -66,6 +84,9 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
             standardsDataList: [...prevState.standardsDataList, updatedStandartData]
         }));
         setStandartSelections([...standarts, standardValue]);
+
+        setStandartsState(prevState => prevState.filter(standard => standard !== updatedStandartData.standar_name.replace('_', '.')));
+
     };
 
     const handleInputChange = (e) => {
@@ -103,6 +124,17 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
         setStandartValue(value);
     };
 
+    const [modalOpen, setModalOpen] = useState(false);
+
+    const showModal = () => {
+        setActiveAccessModalData({});
+        setModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setModalOpen(false);
+    };
+
     const handleModalCancel = () => {
         setErrors({});
         setStandartValue('');
@@ -131,18 +163,15 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
             return;
         }
 
-        if (defaultStandardIndex < 0) {
+        const hasDefault = hub.standardsDataList.some(item => item.isDefault);
+
+        if (!hasDefault) {
             setSnackbarMessage('Set default standard');
             setSnackbarOpen(true);
             return;
         }
 
         if (hub.id) {
-
-            var defaultStandart = hub.standardsDataList[defaultStandardIndex];
-
-            if (defaultStandart)
-                defaultStandart.isDefault = true;
 
             setErrors({});
             updateAccessPointByUUID(hub);
@@ -155,9 +184,6 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
         }
 
         setStandartSelections([]);
-
-        var defaultStandart = hub.standardsDataList[defaultStandardIndex];
-        defaultStandart.isDefault = true;
 
         hub.id = uuidv4();
 
@@ -239,62 +265,59 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
                         />
                     </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth margin="normal">
-                        <InputLabel>{'Standard'}</InputLabel>
-                        <Select
-                            label={'Standart'}
-                            name='standard'
-                            onChange={(e) => handleStandartInputChange(e)}
-                            id='5'
-                        >
-                            <MenuItem key={'3g'} value={'3g'}>{'3G'}</MenuItem>
-                            <MenuItem key={'4g'} value={'4g'}>{'4G'}</MenuItem>
-                            <MenuItem key={'5g'} value={'5g'}>{'5G'}</MenuItem>
-                        </Select>
-                    </FormControl>
+                <Grid item xs={12} sm={12}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => showModal()}
+                        style={{ color: 'black', borderColor: 'black', width: '100%', height: '56px' }}>
+                        {'Add Version'}
+                    </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
+
                     {hub.standardsDataList?.map((itemData, index) => (
-                        <Grid container alignItems="center" key={index}>
-                            <Grid item>
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={itemData.isDefault}
-                                            onChange={() => handleDefaultStandardChange(index)}
-                                        />
-                                    }
-                                    label={itemData.standar_name}
-                                />
+                        <Grid item container alignItems="center" key={index}>
+                            <Grid item xs={12} sm={6}>
+                                <Box display="flex" alignItems="center">
+                                    {/* Checkbox without label */}
+                                    <Checkbox
+                                        checked={itemData.isDefault}
+                                        onChange={() => handleDefaultStandardChange(index)}
+                                    />
+
+                                    {/* Label as Typography, to prevent Checkbox from triggering */}
+                                    <Typography
+                                        // onClick={() => handleOnClickStandard(itemData)} // Replace with desired action
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {itemData.standar_name}
+                                    </Typography>
+
+                                    {/* Close Icon for delete, positioned right next to the label */}
+                                    <IconButton onClick={() => handleRemoveStandard(index)} size="small">
+                                        <CloseIcon />
+                                    </IconButton>
+                                </Box>
                             </Grid>
+
+                            {/* Display success icon if the item is implemented */}
                             <Grid item>
                                 {itemData.isImplemented && <CheckCircleIcon color="success" />}
                             </Grid>
-                            <Grid item>
-                                <IconButton onClick={() => handleRemoveStandard(index)}>
-                                    <DeleteIcon />
-                                </IconButton>
-                            </Grid>
                         </Grid>
                     ))}
+                    {hub.standardsDataList?.length > 0 && !hub.standardsDataList.some(item => item.isDefault) && (
+                        <Box display="flex" alignItems="center" mt={2}>
+                            <InfoIcon color="primary" style={{ marginRight: '8px' }} />
+                            <Typography variant="body2" color="textSecondary">
+                                Check the utilized standard.
+                            </Typography>
+                        </Box>
+                    )}
                 </Grid>
+                <AddStandardModal open={modalOpen} handleClose={closeModal} updateStandartData={updateStandartData} standards={standartsState} activeAccessModalData={activeAccessModalData} />
             </Grid>
         )
-    };
-
-    const renderStandartChoice = () => {
-        switch (standardValue) {
-            case '3g':
-                return (<ThreeG updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
-            case '4g':
-                return (<FourG updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
-            case '5g':
-                return (<FiveG updateStandartData={updateStandartData} setStandartValue={setStandartValue} />)
-            default:
-                return (''
-                );
-        }
     };
 
     return (
@@ -302,7 +325,6 @@ const GsmNodeModal = ({ open, handleClose, updateHub, hubData, updateAccessPoint
             <DialogTitle>Add Hub</DialogTitle>
             <DialogContent>
                 {renderQuestions()}
-                {renderStandartChoice()}
             </DialogContent>
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>

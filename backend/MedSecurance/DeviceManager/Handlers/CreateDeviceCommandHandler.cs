@@ -8,6 +8,7 @@ using MedSecurance.DeviceManager.Commands;
 using MedSecurance.DeviceManager.Extensions;
 using MedSecurance.DeviceManager.Models;
 using MedSecurance.DeviceManager.Repositories.Interfaces;
+using MedSecurance.Extensions;
 
 namespace MedSecurance.DeviceManager.Handlers;
 
@@ -35,6 +36,7 @@ public class CreateDeviceCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId, 
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLogCategory.DeviceManagement, 
             Action = ActivityLogAction.Add,
             Details = $"Device with id {returnedId} has been created"

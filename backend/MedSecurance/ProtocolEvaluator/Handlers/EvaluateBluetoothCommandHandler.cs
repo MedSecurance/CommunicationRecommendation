@@ -2,6 +2,7 @@
 using MediatR;
 using MedSecurance.ActivityLog.Models;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
+using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
@@ -15,9 +16,9 @@ public class EvaluateBluetoothCommandHandler(
     IRiskAssessmentRepository riskAssessmentRepository,
     IHttpContextAccessor httpContextAccessor,
     IActivityLogRepository activityLogRepository
-) : IRequestHandler<EvaluateBluetoothCommand, EvaluateBluetoothCommandResponse>
+) : IRequestHandler<EvaluateBluetoothCommand, EvaluateCommandResponse>
 {
-    public async Task<EvaluateBluetoothCommandResponse> Handle(EvaluateBluetoothCommand request,
+    public async Task<EvaluateCommandResponse> Handle(EvaluateBluetoothCommand request,
         CancellationToken cancellationToken)
     {
         logger.LogInformation(
@@ -48,11 +49,16 @@ public class EvaluateBluetoothCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLog.Models.Enums.ActivityLogCategory.RiskAssessment,
             Action = ActivityLog.Models.Enums.ActivityLogAction.Execute,
             Details = $"{nameof(EvaluateBluetoothCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
         
-        return new EvaluateBluetoothCommandResponse(evaluatorResult.Suggestions);
+        return new EvaluateCommandResponse(
+            evaluatorResult.Mitigations,
+            evaluatorResult.SafeConfigs,
+            evaluatorResult.Replacements
+        );
     }
 }

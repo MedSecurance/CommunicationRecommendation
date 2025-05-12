@@ -20,8 +20,9 @@ public static class DeviceManagerEndpointsInit
                         networkName));
                 })
             .WithName("GetDevices")
-            .WithTags("Device Manager");
-        //.RequireAuthorization();
+            .WithTags("Device Manager")
+            .RequireAuthorization("View");
+
 
         app
             .MapGet("device-manager/devices/{id:guid}",
@@ -31,7 +32,7 @@ public static class DeviceManagerEndpointsInit
                 })
             .WithName("GetDeviceById")
             .WithTags("Device Manager")
-            .RequireAuthorization();
+            .RequireAuthorization("View");
 
         app.MapPost("device-manager/devices", async (IMediator mediator, DeviceRequest newDevice) =>
             {
@@ -48,7 +49,7 @@ public static class DeviceManagerEndpointsInit
             })
             .WithName("CreateDevice")
             .WithTags("Device Manager")
-            .RequireAuthorization();
+            .RequireAuthorization("Create");
 
         app.MapPut("device-manager/devices/{id:guid}",
                 async (IMediator mediator, Guid id, DeviceRequest updatedDevice) =>
@@ -66,7 +67,7 @@ public static class DeviceManagerEndpointsInit
                 })
             .WithName("UpdateDevice")
             .WithTags("Device Manager")
-            .RequireAuthorization();
+            .RequireAuthorization("Update");
 
         app.MapDelete("device-manager/devices/{id:guid}", async (IMediator mediator, Guid id) =>
             {
@@ -76,7 +77,7 @@ public static class DeviceManagerEndpointsInit
             })
             .WithName("DeleteDevice")
             .WithTags("Device Manager")
-            .RequireAuthorization();
+            .RequireAuthorization("Delete");
 
         return app;
     }

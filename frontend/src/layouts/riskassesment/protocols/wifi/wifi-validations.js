@@ -20,10 +20,11 @@ const wifiValidations = (wifiInputs) => {
 
     validateNumberInput(wifiInputs.ISP_connection_speed_in_Mpbs, 'ISP_connection_speed_in_Mpbs' , newErrors);
     validateNumberInput(wifiInputs.backbone_network_speed_in_Mpbs, 'backbone_network_speed_in_Mpbs' , newErrors);
-    validateNumberInput(wifiInputs.bandwidthInMbps, 'bandwidthInMbps' , newErrors);
 
     const networkDetails = wifiInputs.network_details;
     const deploymentDetails = networkDetails.deployment_details;
+
+    validateNumberInput(networkDetails.other_connected_devices, 'other_connected_devices' , newErrors);
 
     if (!deploymentDetails.placement) {
         newErrors.placement = 'Placement is required';
@@ -32,13 +33,7 @@ const wifiValidations = (wifiInputs) => {
         newErrors.access_points = 'Access points are required';
     }
 
-    if (!deploymentDetails.level_of_interference.length) {
-        newErrors.level_of_interference = 'level_of_interference is required';
-    }
-
-    validateNumberInput(deploymentDetails.typical_latency_in_ms, 'typical_latency_in_ms' , newErrors);
     validateNumberInput(deploymentDetails.lifetime_in_years, 'lifetime_in_years' , newErrors);
-    validateNumberInput(deploymentDetails.area_coverage_in_square_meters, 'area_coverage_in_square_meters' , newErrors);
 
     return newErrors;
 };

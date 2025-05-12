@@ -1,11 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useContext } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { ThemeProvider } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
 import Icon from "@mui/material/Icon";
 import MDBox from "components/MDBox";
-import Sidenav from "examples/Sidenav";
-import Configurator from "examples/Configurator";
 import theme from "assets/theme";
 import themeRTL from "assets/theme/theme-rtl";
 import themeDark from "assets/theme-dark";
@@ -15,14 +11,9 @@ import { CacheProvider } from "@emotion/react";
 import createCache from "@emotion/cache";
 import routes from "routes";
 import { useMaterialUIController, setMiniSidenav, setOpenConfigurator } from "context";
-import brandWhite from "assets/images/logo-ct.png";
-import brandDark from "assets/images/logo-ct-dark.png";
-import { AuthProvider } from "./auth/AuthContext";
 import PrivateRoute from "./PrivateRoute";
-import Login from "./Login";
 import AuthenticatedLayout from "./AuthenticatedLayout";
-import UnauthenticatedLayout from "./UnauthenticatedLayout";
-import Account from "./Account"; // Import the Account component
+import { KeycloakContext } from "./keycloak-provider"; // Assuming this is your Keycloak context
 
 export default function App() {
   const [controller, dispatch] = useMaterialUIController();
@@ -36,9 +27,12 @@ export default function App() {
     whiteSidenav,
     darkMode,
   } = controller;
+
   const [onMouseEnter, setOnMouseEnter] = useState(false);
   const [rtlCache, setRtlCache] = useState(null);
   const { pathname } = useLocation();
+
+  const { keycloak } = useContext(KeycloakContext);
 
   useMemo(() => {
     const cacheRtl = createCache({
@@ -74,6 +68,19 @@ export default function App() {
     document.scrollingElement.scrollTop = 0;
   }, [pathname]);
 
+  const filterRoutesByRoles = (allRoutes, userRoles) => {
+    return allRoutes.filter((route) => {
+      if (route.roles && route.roles.length > 0) {
+        return route.roles.some((role) => userRoles.includes(role));
+      }
+      return true; // If no roles are specified, the route is accessible by all authenticated users
+    });
+  };
+
+  const getUserRoles = () => keycloak?.realmAccess?.roles || []; // Retrieve roles from Keycloak
+
+  const filteredRoutes = filterRoutesByRoles(routes, getUserRoles());
+
   const getRoutes = (allRoutes) =>
     allRoutes.map((route) => {
       if (route.collapse) {
@@ -86,7 +93,7 @@ export default function App() {
             exact
             path={route.route}
             element={
-              <PrivateRoute>
+              <PrivateRoute requiredRoles={route.roles || []}>
                 {route.component}
               </PrivateRoute>
             }
@@ -124,44 +131,11 @@ export default function App() {
 
   return direction === "rtl" ? (
     <CacheProvider value={rtlCache}>
-      <AuthProvider>
-        <Routes>
-          <Route element={<UnauthenticatedLayout theme={darkMode ? themeDarkRTL : themeRTL} />}>
-            <Route path="/login" element={<Login />} />
-          </Route>
-          <Route
-            element={
-              <AuthenticatedLayout
-                theme={darkMode ? themeDarkRTL : themeRTL}
-                darkMode={darkMode}
-                sidenavColor={sidenavColor}
-                transparentSidenav={transparentSidenav}
-                whiteSidenav={whiteSidenav}
-                layout={layout}
-                handleOnMouseEnter={handleOnMouseEnter}
-                handleOnMouseLeave={handleOnMouseLeave}
-                handleConfiguratorOpen={handleConfiguratorOpen}
-                configsButton={configsButton}
-                routes={routes} // Pass routes as a prop
-              />
-            }
-          >
-            {getRoutes(routes)}
-            <Route path="*" element={<Navigate to="/riskassessment" />} />
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </CacheProvider>
-  ) : (
-    <AuthProvider>
       <Routes>
-        <Route element={<UnauthenticatedLayout theme={darkMode ? themeDark : theme} />}>
-          <Route path="/login" element={<Login />} />
-        </Route>
         <Route
           element={
             <AuthenticatedLayout
-              theme={darkMode ? themeDark : theme}
+              theme={darkMode ? themeDarkRTL : themeRTL}
               darkMode={darkMode}
               sidenavColor={sidenavColor}
               transparentSidenav={transparentSidenav}
@@ -171,14 +145,37 @@ export default function App() {
               handleOnMouseLeave={handleOnMouseLeave}
               handleConfiguratorOpen={handleConfiguratorOpen}
               configsButton={configsButton}
-              routes={routes} // Pass routes as a prop
+              routes={filteredRoutes} // Pass filtered routes
             />
           }
         >
-          {getRoutes(routes)}
+          {getRoutes(filteredRoutes)}
           <Route path="*" element={<Navigate to="/riskassessment" />} />
         </Route>
       </Routes>
-    </AuthProvider>
+    </CacheProvider>
+  ) : (
+    <Routes>
+      <Route
+        element={
+          <AuthenticatedLayout
+            theme={darkMode ? themeDark : theme}
+            darkMode={darkMode}
+            sidenavColor={sidenavColor}
+            transparentSidenav={transparentSidenav}
+            whiteSidenav={whiteSidenav}
+            layout={layout}
+            handleOnMouseEnter={handleOnMouseEnter}
+            handleOnMouseLeave={handleOnMouseLeave}
+            handleConfiguratorOpen={handleConfiguratorOpen}
+            configsButton={configsButton}
+            routes={filteredRoutes} // Pass filtered routes
+          />
+        }
+      >
+        {getRoutes(filteredRoutes)}
+        <Route path="*" element={<Navigate to="/riskassessment" />} />
+      </Route>
+    </Routes>
   );
 }

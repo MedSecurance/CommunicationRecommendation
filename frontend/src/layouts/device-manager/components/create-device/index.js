@@ -1,21 +1,22 @@
 import React, { useState, useContext, useEffect } from 'react';
 import {
-    Grid, Button, TextField, FormControl, Dialog, DialogContent, DialogTitle, InputLabel, 
+    Grid, Button, TextField, FormControl, Dialog, DialogContent, DialogTitle, InputLabel,
     Select, MenuItem, DialogActions, FormControlLabel, Checkbox, Box, Typography, Paper, FormHelperText, Tooltip
 } from '@mui/material';
 import { AddDevice } from "services/device-manager-service";
 import { DatePicker } from '@mui/x-date-pickers';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { AuthContext } from '../../../../auth/AuthContext';
+import { KeycloakContext } from '../../../../keycloak-provider';
 import { ValidateFromData, SetProtocolsData } from '../helpers/validations'
-import { standardsUtilizedItems, encryptionItems } from '../helpers/data-helper';
+import { standardsUtilizedItems, encryptionItems, gsmGenerationsMapping } from '../helpers/data-helper';
 
-import {deviceManagerToolTips} from '../../tooltips'
+import { deviceManagerToolTips } from '../../tooltips'
+import {useFormHandlers} from "../../../../hooks/useFormHandlers";
 
 const CreateDeviceDialog = ({ open, handleClose }) => {
 
-    const { getAuthHeaders } = useContext(AuthContext);
+    const { getAuthHeaders } = useContext(KeycloakContext);
     const [errors, setErrors] = useState({});
     const [frequenciesToSelect, setFrequenciesToSelect] = useState([]);
     const [encryptionToSelect, setEncryptionToSelect] = useState([]);
@@ -29,10 +30,8 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
         manufacturingDate: new Date(),
         communicationProtocol: '',
         networkName: '',
-        networkIdentifier: '',
         doctorId: '',
         location: '',
-        batteryStatus: 0,
         validated: false,
         standardCompliance: false,
         supportedCommunicationProtocols: [],
@@ -40,7 +39,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
             ipAddress: "",
             macAddress: "",
             encryption: "",
-            bandwidth: 0,
             firmware: "",
             firmwareDate: new Date(),
             supportedStandards: [],
@@ -49,7 +47,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
             frequencyUtilized: "",
         },
         gsmSpecs: {
-            bandwidth: 0,
             macAddress: "",
             firmware: "",
             firmwareDate: new Date(),
@@ -57,7 +54,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
             utilizedGeneration: "",
         },
         bluetoothSpecs: {
-            bandwidth: 0,
             firmware: "",
             macAddress: "",
             firmwareDate: new Date(),
@@ -73,6 +69,16 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
             utilizedTopology: "",
             utilizedAccessControlMechanism: "",
             utilizedVersion: ""
+        },
+        lorawanSpecs: {
+            macAddress: "",
+            firmware: "",
+            firmwareDate: new Date(),
+            supportedFrequencyBands: [],
+            utilizedFrequencyBand: "",
+            physicalLocation: "",
+            adaptiveDataRate: false,
+            joinMode: ""
         }
     });
 
@@ -88,10 +94,8 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
             manufacturingDate: new Date(),
             communicationProtocol: '',
             networkName: '',
-            networkIdentifier: '',
             doctorId: '',
             location: '',
-            batteryStatus: 0,
             validated: false,
             standardCompliance: false,
             supportedCommunicationProtocols: [],
@@ -99,7 +103,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                 ipAddress: "",
                 macAddress: "",
                 encryption: "",
-                bandwidth: 0,
                 firmware: "",
                 firmwareDate: new Date(),
                 supportedStandards: [],
@@ -108,7 +111,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                 frequencyUtilized: "",
             },
             gsmSpecs: {
-                bandwidth: 0,
                 macAddress: "",
                 firmware: "",
                 firmwareDate: new Date(),
@@ -116,7 +118,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                 utilizedGeneration: "",
             },
             bluetoothSpecs: {
-                bandwidth: 0,
                 firmware: "",
                 macAddress: "",
                 firmwareDate: new Date(),
@@ -132,6 +133,16 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                 utilizedTopology: "",
                 utilizedAccessControlMechanism: "",
                 utilizedVersion: ""
+            },
+            lorawanSpecs: {
+                macAddress: "",
+                firmware: "",
+                firmwareDate: new Date(),
+                supportedFrequencyBands: [],
+                utilizedFrequencyBand: "",
+                physicalLocation: "",
+                adaptiveDataRate: false,
+                joinMode: ""
             }
         });
 
@@ -170,11 +181,25 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
 
     const handleProtocolChange = (e) => {
         const protocol = e.target.name;
+        const isChecked = e.target.checked;
+
         setFormData((prevState) => {
-            const newProtocols = prevState.supportedCommunicationProtocols.includes(protocol)
-                ? prevState.supportedCommunicationProtocols.filter(p => p !== protocol)
-                : [...prevState.supportedCommunicationProtocols, protocol];
-            return { ...prevState, supportedCommunicationProtocols: newProtocols };
+            let newSupportedProtocols = isChecked
+                ? [...prevState.supportedCommunicationProtocols, protocol]
+                : prevState.supportedCommunicationProtocols.filter(p => p !== protocol);
+
+            let newCommunicationProtocol = prevState.communicationProtocol;
+
+            // Remove from communicationProtocol if it matches the unchecked protocol
+            if (!isChecked && prevState.communicationProtocol === protocol) {
+                newCommunicationProtocol = '';
+            }
+
+            return {
+                ...prevState,
+                supportedCommunicationProtocols: newSupportedProtocols,
+                communicationProtocol: newCommunicationProtocol
+            };
         });
     };
 
@@ -198,36 +223,42 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
     };
 
     const handleBluetoothVersionsSelector = (e, specKey, field) => {
-        debugger;
         const value = e.target.value;
-        
+
         setFormData({
             ...formData,
             [specKey]: {
                 ...formData[specKey],
                 [field]: Array.isArray(value) ? value : e.target.value,
-                ["utilizedVersion"] : ""
+                ["utilizedVersion"]: ""
             }
         });
-   
+
     };
 
+    const handleLoraFrequencyBandsSelector = (e, specKey, field) => {
 
-    const handleCheckboxChange = (e) => {
-        const { name, checked } = e.target;
-        setFormData(prevState => ({
-            ...prevState,
-            [name]: checked,
-        }));
+        const value = e.target.value;
+
+        setFormData({
+            ...formData,
+            [specKey]: {
+                ...formData[specKey],
+                [field]: Array.isArray(value) ? value : e.target.value,
+                ["utilizedVersion"]: ""
+            }
+        });
+
     };
+
+    const { handleCheckboxChange } = useFormHandlers(setFormData);
 
     const handleUtilizedStandardChange = (e, specKey, field) => {
 
         const value = e.target.value;
-        debugger;
 
         const frequenciesSupported = standardsUtilizedItems[value];
-        
+
         setEncryptionToSelect([]);
         setFrequenciesToSelect(frequenciesSupported);
 
@@ -244,7 +275,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
     const handleUtilizedFregChange = (e, specKey, field) => {
 
         const value = e.target.value;
-        debugger;
 
         const encryptionSupported = encryptionItems[formData.wifiSpecs.standardUtilized][value];
 
@@ -260,8 +290,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
         });
     };
 
-
-
     const renderProtocolFields = () => {
         return (
             <>
@@ -271,18 +299,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                             <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
                                 <Typography variant="h6">{'WiFi'}</Typography>
                             </Box>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <TextField
-                                    label="Bandwidth"
-                                    type="number"
-                                    value={formData.wifiSpecs.bandwidth || ''}
-                                    onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'bandwidth')}
-                                    error={!!errors.wifiSpecs?.bandwidth}
-                                    helperText={errors.wifiSpecs?.bandwidth ?? ''}
-                                />
-                            </FormControl>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
@@ -371,6 +387,7 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                                 )}
                             </FormControl>
                         </Grid>
+
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
                                 <InputLabel>{"Utilized Standard"}</InputLabel>
@@ -379,12 +396,12 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                                     value={formData.wifiSpecs.standardUtilized || []}
                                     onChange={(e) => handleUtilizedStandardChange(e, 'wifiSpecs', 'standardUtilized')}
                                 >
-                                    <MenuItem value="_802_11a">802.11a</MenuItem>
-                                    <MenuItem value="_802_11b">802.11b</MenuItem>
-                                    <MenuItem value="_802_11g">802.11g</MenuItem>
-                                    <MenuItem value="_802_11n">802.11n</MenuItem>
-                                    <MenuItem value="_802_11ac">802.11ac</MenuItem>
-                                    <MenuItem value="_802_11ax">802.11ax</MenuItem>
+                                    {
+                                        formData.wifiSpecs.supportedStandards?.map((itemData) => (
+
+                                            <MenuItem value={itemData}>{itemData.slice(1).replace(/_/g, '.')}</MenuItem>
+
+                                        ))}
                                 </Select>
                                 {errors.wifiSpecs?.standardUtilized && (
                                     <FormHelperText sx={{ color: 'red' }}>{errors.wifiSpecs?.standardUtilized}</FormHelperText>
@@ -420,7 +437,7 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                                     value={formData.wifiSpecs.encryption}
                                     onChange={(e) => handleSpecChange(e, 'wifiSpecs', 'encryption')}
                                 >
-                                                                  {
+                                    {
                                         encryptionToSelect?.map((itemData) => (
                                             <MenuItem key={itemData.value} value={itemData.value}>{itemData.displayValue}</MenuItem>
 
@@ -440,16 +457,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                             <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
                                 <Typography variant="h6">{'GSM'}</Typography>
                             </Box>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <TextField
-                                    label="Bandwidth"
-                                    type="number"
-                                    value={formData.gsmSpecs.bandwidth || ''}
-                                    onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'bandwidth')}
-                                />
-                            </FormControl>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
@@ -504,6 +511,26 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                                 )}
                             </FormControl>
                         </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"Utilized Generations"}</InputLabel>
+                                <Select
+                                    label="Utilized Generations"
+                                    value={formData.gsmSpecs.utilizedGeneration || []}
+                                    onChange={(e) => handleSpecChange(e, 'gsmSpecs', 'utilizedGeneration')}
+                                >
+                                    {
+                                        formData.gsmSpecs.supportedGenerations?.map((itemData) => (
+
+                                            <MenuItem value={itemData}>{gsmGenerationsMapping(itemData)}</MenuItem>
+
+                                        ))}
+                                </Select>
+                                {errors.gsmSpecs?.utilizedGeneration && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.gsmSpecs?.utilizedGeneration}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
                     </>
                 )}
                 {formData.supportedCommunicationProtocols?.includes('Bluetooth') && (
@@ -512,18 +539,6 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                             <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
                                 <Typography variant="h6">{'Bluetooth'}</Typography>
                             </Box>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <TextField
-                                    label="Bandwidth"
-                                    type="number"
-                                    value={formData.bluetoothSpecs.bandwidth || ''}
-                                    onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'bandwidth')}
-                                    error={!!errors.bluetoothSpecs?.bandwidth}
-                                    helperText={errors.bluetoothSpecs?.bandwidth ?? ''}
-                                />
-                            </FormControl>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth margin="normal">
@@ -685,16 +700,154 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
                                     value={formData.bluetoothSpecs.utilizedVersion || []}
                                     onChange={(e) => handleSpecChange(e, 'bluetoothSpecs', 'utilizedVersion')}
                                 >
-                                        {
+                                    {
                                         formData.bluetoothSpecs.supportedVersions?.map((itemData) => (
 
-                                            <MenuItem value={itemData}>{"v"+itemData}</MenuItem>
+                                            <MenuItem value={itemData}>{"v" + itemData}</MenuItem>
 
-                                        ))}   
+                                        ))}
                                 </Select>
                                 {errors.bluetoothSpecs?.utilizedVersion && (
                                     <FormHelperText sx={{ color: 'red' }}>{errors.bluetoothSpecs?.utilizedVersion}</FormHelperText>
                                 )}
+                            </FormControl>
+                        </Grid>
+                    </>
+                )}
+                {formData.supportedCommunicationProtocols?.includes('LoraWan') && (
+                    <>
+                        <Grid item xs={12}>
+                            <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
+                                <Typography variant="h6">{'LoraWan'}</Typography>
+                            </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <TextField
+                                    label="Firmware"
+                                    type="text"
+                                    value={formData.lorawanSpecs.firmware || ''}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'firmware')}
+                                    error={!!errors.lorawanSpecs?.firmware}
+                                    helperText={errors.lorawanSpecs?.firmware ?? ''}
+                                />
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <TextField
+                                    label="MacAdress"
+                                    type="text"
+                                    value={formData.lorawanSpecs.macAddress || ''}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'macAddress')}
+                                    error={!!errors.lorawanSpecs?.macAddress}
+                                    helperText={errors.lorawanSpecs?.macAddress ?? ''}
+                                />
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DatePicker
+                                        label="Firmware Date"
+                                        value={formData.lorawanSpecs.firmwareDate || new Date()}
+                                        onChange={(date) => handleSpecChange({ target: { value: date } }, 'lorawanSpecs', 'firmwareDate')}
+                                        renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
+                                    />
+                                </LocalizationProvider>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"Supported Frequency Bands"}</InputLabel>
+                                <Select
+                                    label="Supported Frequency Bands"
+                                    value={formData.lorawanSpecs.supportedFrequencyBands || []}
+                                    onChange={(e) => handleLoraFrequencyBandsSelector(e, 'lorawanSpecs', 'supportedFrequencyBands')}
+                                    multiple
+                                >
+                                    <MenuItem value="EU868">EU868</MenuItem>
+                                    <MenuItem value="US915">US915</MenuItem>
+                                    <MenuItem value="AS923">AS923</MenuItem>
+                                    <MenuItem value="AU915">AU915</MenuItem>
+                                    <MenuItem value="CN470">CN470</MenuItem>
+                                    <MenuItem value="KR920">KR920</MenuItem>
+                                    <MenuItem value="IN865">IN865</MenuItem>
+                                    <MenuItem value="RU864">RU864</MenuItem>
+                                    <MenuItem value="RU868">RU868</MenuItem>
+
+                                </Select>
+                                {errors.lorawanSpecs?.supportedFrequencyBands && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.supportedFrequencyBands}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"Utilized Frequency Bands"}</InputLabel>
+                                <Select
+                                    label="Utilized Frequency Bands"
+                                    value={formData.lorawanSpecs.utilizedFrequencyBand || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'utilizedFrequencyBand')}
+                                >
+                                    {
+                                        formData.lorawanSpecs.supportedFrequencyBands?.map((itemData) => (
+
+                                            <MenuItem value={itemData}>{itemData}</MenuItem>
+
+                                        ))}
+                                </Select>
+                                {errors.lorawanSpecs?.utilizedFrequencyBand && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.utilizedFrequencyBand}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"JoinMode"}</InputLabel>
+                                <Select
+                                    label="Join Mode"
+                                    value={formData.lorawanSpecs.joinMode || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'joinMode')}
+                                >
+                                    <MenuItem value="ABP">ABP</MenuItem>
+                                    <MenuItem value="OTAA">OTAA</MenuItem>
+                                </Select>
+                                {errors.lorawanSpecs?.joinMode && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.joinMode}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>{"PhysicalLocation"}</InputLabel>
+                                <Select
+                                    label="Physical Location"
+                                    value={formData.lorawanSpecs.physicalLocation || []}
+                                    onChange={(e) => handleSpecChange(e, 'lorawanSpecs', 'physicalLocation')}
+                                >
+                                    <MenuItem value="OpenSpace">OpenSpace</MenuItem>
+                                    <MenuItem value="PrivatePlace">PrivatePlace</MenuItem>
+                                    <MenuItem value="SecurePlace">SecurePlace</MenuItem>
+                                </Select>
+                                {errors.lorawanSpecs?.physicalLocation && (
+                                    <FormHelperText sx={{ color: 'red' }}>{errors.lorawanSpecs?.physicalLocation}</FormHelperText>
+                                )}
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            inputProps={{'aria-label': 'Adaptive Data Rate'}}
+                                            name='lorawanSpecs.adaptiveDataRate'
+                                            checked={formData.lorawanSpecs.adaptiveDataRate}
+                                            onChange={handleSpecChange}
+                                        />
+                                    }
+                                    label={'Adaptive Data Rate'}
+                                />
                             </FormControl>
                         </Grid>
                     </>
@@ -709,266 +862,249 @@ const CreateDeviceDialog = ({ open, handleClose }) => {
             <DialogContent>
                 <form onSubmit={handleCreate}>
                     <Grid container spacing={2}>
-                    <Tooltip title={deviceManagerToolTips.DeviceName}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Name"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.name}
-                                helperText={errors.name ?? ''}
-                            />
-                        </Grid>
+                        <Tooltip title={deviceManagerToolTips.DeviceName}>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Name"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    fullWidth
+                                    margin="normal"
+                                    error={!!errors.name}
+                                    helperText={errors.name ?? ''}
+                                />
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.DeviceSerialNumber}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Serial Number"
-                                name="serialNumber"
-                                value={formData.serialNumber}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.serialNumber}
-                                helperText={errors.serialNumber ?? ''}
-                            />
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Serial Number"
+                                    name="serialNumber"
+                                    value={formData.serialNumber}
+                                    onChange={handleInputChange}
+                                    fullWidth
+                                    margin="normal"
+                                    error={!!errors.serialNumber}
+                                    helperText={errors.serialNumber ?? ''}
+                                />
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.DeviceType ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <InputLabel>Type</InputLabel>
-                                <Select
-                                    label="Type"
-                                    name="type"
-                                    value={formData.type}
-                                    onChange={handleInputChange}
-                                >
-                                    <MenuItem value="Sensor">Sensor</MenuItem>
-                                    <MenuItem value="Actuator">Actuator</MenuItem>
-                                    <MenuItem value="Collector">Collector</MenuItem>
-                                </Select>
-                                {errors.type && (
-                                    <FormHelperText sx={{ color: 'red' }}>{errors.type}</FormHelperText>
-                                )}
-                            </FormControl>
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth margin="normal">
+                                    <InputLabel>Type</InputLabel>
+                                    <Select
+                                        label="Type"
+                                        name="type"
+                                        value={formData.type}
+                                        onChange={handleInputChange}
+                                    >
+                                        <MenuItem value="Sensor">Sensor</MenuItem>
+                                        <MenuItem value="Actuator">Actuator</MenuItem>
+                                        <MenuItem value="Collector">Collector</MenuItem>
+                                    </Select>
+                                    {errors.type && (
+                                        <FormHelperText sx={{ color: 'red' }}>{errors.type}</FormHelperText>
+                                    )}
+                                </FormControl>
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.Manufacture ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Manufacturer"
-                                name="manufacturer"
-                                value={formData.manufacturer}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.manufacturer}
-                                helperText={errors.manufacturer ?? ''}
-                            />
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Manufacturer"
+                                    name="manufacturer"
+                                    value={formData.manufacturer}
+                                    onChange={handleInputChange}
+                                    fullWidth
+                                    margin="normal"
+                                    error={!!errors.manufacturer}
+                                    helperText={errors.manufacturer ?? ''}
+                                />
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.Description ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.description}
-                                helperText={errors.description ?? ''}
-                            />
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Description"
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    fullWidth
+                                    margin="normal"
+                                    error={!!errors.description}
+                                    helperText={errors.description ?? ''}
+                                />
+                            </Grid>
                         </Tooltip>
-                        <Tooltip title={deviceManagerToolTips.ManufactureDate ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                    <DatePicker
-                                        label="Manufacturing Date"
-                                        value={formData.manufacturingDate}
-                                        onChange={(date) => handleDateChange(date, 'manufacturingDate')}
-                                        renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
-                                    />
-                                </LocalizationProvider>
-                            </FormControl>
-                        </Grid>
+                        <Tooltip title={deviceManagerToolTips.ManufactureDate ?? ""} placement="right">
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth margin="normal">
+                                    <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                        <DatePicker
+                                            label="Manufacturing Date"
+                                            value={formData.manufacturingDate}
+                                            onChange={(date) => handleDateChange(date, 'manufacturingDate')}
+                                            renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
+                                        />
+                                    </LocalizationProvider>
+                                </FormControl>
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.NetworkName ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Network Name"
-                                name="networkName"
-                                value={formData.networkName}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.networkName}
-                                helperText={errors.networkName ?? ''}
-                            />
-                        </Grid>
-                        </Tooltip>
-                        <Tooltip title={deviceManagerToolTips.NetworkIdentifier ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Network Identifier"
-                                name="networkIdentifier"
-                                value={formData.networkIdentifier}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.networkIdentifier}
-                                helperText={errors.networkIdentifier ?? ''}
-                            />
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Network Name"
+                                    name="networkName"
+                                    value={formData.networkName}
+                                    onChange={handleInputChange}
+                                    fullWidth
+                                    margin="normal"
+                                    error={!!errors.networkName}
+                                    helperText={errors.networkName ?? ''}
+                                />
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.DoctorId ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Doctor ID"
-                                name="doctorId"
-                                value={formData.doctorId}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.doctorId}
-                                helperText={errors.doctorId ?? ''}
-                            />
-                        </Grid>
-                        </Tooltip>
-                        <Tooltip title={deviceManagerToolTips.BatteryStatus ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Battery Status"
-                                type="number"
-                                name="batteryStatus"
-                                value={formData.batteryStatus}
-                                onChange={handleInputChange}
-                                fullWidth
-                                margin="normal"
-                            />
-                        </Grid>
-                        </Tooltip>
-                        <Tooltip title={deviceManagerToolTips.Location ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <InputLabel>{'Location'}</InputLabel>
-                                <Select
-                                    label="Location"
-                                    name='location'
-                                    value={formData.location}
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Doctor ID"
+                                    name="doctorId"
+                                    value={formData.doctorId}
                                     onChange={handleInputChange}
-                                >
-                                    <MenuItem value="OpenSpace">OpenSpace</MenuItem>
-                                    <MenuItem value="PrivatePlace">PrivatePlace</MenuItem>
-                                    <MenuItem value="SecurePlace">SecurePlace</MenuItem>
-                                </Select>
-                                {errors.location && (
-                                    <FormHelperText sx={{ color: 'red' }}>{errors.location}</FormHelperText>
-                                )}
-                            </FormControl>
-                        </Grid>
+                                    fullWidth
+                                    margin="normal"
+                                    error={!!errors.doctorId}
+                                    helperText={errors.doctorId ?? ''}
+                                />
+                            </Grid>
+                        </Tooltip>
+                        <Tooltip title={deviceManagerToolTips.Location ?? ""} placement="left">
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth margin="normal">
+                                    <InputLabel>{'Location'}</InputLabel>
+                                    <Select
+                                        label="Location"
+                                        name='location'
+                                        value={formData.location}
+                                        onChange={handleInputChange}
+                                    >
+                                        <MenuItem value="OpenSpace">OpenSpace</MenuItem>
+                                        <MenuItem value="PrivatePlace">PrivatePlace</MenuItem>
+                                        <MenuItem value="SecurePlace">SecurePlace</MenuItem>
+                                    </Select>
+                                    {errors.location && (
+                                        <FormHelperText sx={{ color: 'red' }}>{errors.location}</FormHelperText>
+                                    )}
+                                </FormControl>
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.Validated ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            inputProps={{ 'aria-label': 'Hidden ssid' }}
-                                            name='validated'
-                                            checked={formData.validated}
-                                            onChange={handleCheckboxChange}
-                                        />
-                                    }
-                                    label={'Validated'}
-                                />
-                            </FormControl>
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                inputProps={{ 'aria-label': 'Hidden ssid' }}
+                                                name='validated'
+                                                checked={formData.validated}
+                                                onChange={handleCheckboxChange}
+                                            />
+                                        }
+                                        label={'Validated'}
+                                    />
+                                </FormControl>
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.StandardCompliance ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            inputProps={{ 'aria-label': 'Hidden ssid' }}
-                                            name='standardCompliance'
-                                            checked={formData.standardCompliance}
-                                            onChange={handleCheckboxChange}
-                                        />
-                                    }
-                                    label={'Standard Compliance'}
-                                />
-                            </FormControl>
-                        </Grid>
-                        </Tooltip>
-                        <Tooltip title={deviceManagerToolTips.CommunicationProtocol ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                                <InputLabel>{'Communication Protocol'}</InputLabel>
-                                <Select
-                                    onChange={handleProtocolUtilizedChange}
-                                    label={'Communication Protocol'}
-                                    value={formData.communicationProtocol}
-                                >
-                                    {
-                                        formData.supportedCommunicationProtocols?.map((itemData) => (
-
-                                            <MenuItem key={itemData} value={itemData}>{itemData}</MenuItem>
-
-                                        ))}
-                                </Select>
-                                {errors.communicationProtocol && (
-                                    <FormHelperText sx={{ color: 'red' }}>{errors.communicationProtocol}</FormHelperText>
-                                )}
-                            </FormControl>
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                inputProps={{ 'aria-label': 'Hidden ssid' }}
+                                                name='standardCompliance'
+                                                checked={formData.standardCompliance}
+                                                onChange={handleCheckboxChange}
+                                            />
+                                        }
+                                        label={'Standard Compliance'}
+                                    />
+                                </FormControl>
+                            </Grid>
                         </Tooltip>
                         <Tooltip title={deviceManagerToolTips.CommunicationProtocolCheckboxes ?? ""}>
-                        <Grid item xs={12} sm={6}>
-                            <FormControl component="fieldset" fullWidth margin="normal">
-                                <Typography component="legend">Communication Protocols</Typography>
-                                <Box display="flex" flexDirection="row">
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={formData.supportedCommunicationProtocols?.includes('WiFi')}
-                                                onChange={handleProtocolChange}
-                                                name="WiFi"
-                                            />
-                                        }
-                                        label="WiFi"
-                                    />
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={formData.supportedCommunicationProtocols?.includes('Bluetooth')}
-                                                onChange={handleProtocolChange}
-                                                name="Bluetooth"
-                                            />
-                                        }
-                                        label="Bluetooth"
-                                    />
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={formData.supportedCommunicationProtocols?.includes('GSM')}
-                                                onChange={handleProtocolChange}
-                                                name="GSM"
-                                            />
-                                        }
-                                        label="GSM"
-                                    />
-                                    {/* Add more protocols as needed */}
-                                </Box>
-                            </FormControl>
-                        </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl component="fieldset" fullWidth margin="normal">
+                                    <Typography component="legend">Communication Protocols</Typography>
+                                    <Box display="flex" flexDirection="row">
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={formData.supportedCommunicationProtocols?.includes('WiFi')}
+                                                    onChange={handleProtocolChange}
+                                                    name="WiFi"
+                                                />
+                                            }
+                                            label="WiFi"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={formData.supportedCommunicationProtocols?.includes('Bluetooth')}
+                                                    onChange={handleProtocolChange}
+                                                    name="Bluetooth"
+                                                />
+                                            }
+                                            label="Bluetooth"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={formData.supportedCommunicationProtocols?.includes('GSM')}
+                                                    onChange={handleProtocolChange}
+                                                    name="GSM"
+                                                />
+                                            }
+                                            label="GSM"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={formData.supportedCommunicationProtocols?.includes('LoraWan')}
+                                                    onChange={handleProtocolChange}
+                                                    name="LoraWan"
+                                                />
+                                            }
+                                            label="LoraWan"
+                                        />
+                                        {/* Add more protocols as needed */}
+                                    </Box>
+                                </FormControl>
+                            </Grid>
+                        </Tooltip>
+                        <Tooltip title={deviceManagerToolTips.CommunicationProtocol ?? ""}>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth margin="normal">
+                                    <InputLabel>{'Communication Protocol'}</InputLabel>
+                                    <Select
+                                        onChange={handleProtocolUtilizedChange}
+                                        label={'Communication Protocol'}
+                                        value={formData.communicationProtocol}
+                                    >
+                                        {
+                                            formData.supportedCommunicationProtocols?.map((itemData) => (
+
+                                                <MenuItem key={itemData} value={itemData}>{itemData}</MenuItem>
+
+                                            ))}
+                                    </Select>
+                                    {errors.communicationProtocol && (
+                                        <FormHelperText sx={{ color: 'red' }}>{errors.communicationProtocol}</FormHelperText>
+                                    )}
+                                </FormControl>
+                            </Grid>
                         </Tooltip>
                         {renderProtocolFields()}
                     </Grid>

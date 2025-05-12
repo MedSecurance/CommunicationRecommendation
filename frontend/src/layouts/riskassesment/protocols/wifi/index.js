@@ -2,11 +2,12 @@ import {
     Button, Select,
     MenuItem, FormControl, InputLabel, TextField, Box,
     Grid, Checkbox, FormControlLabel,
-    Typography, Paper, FormHelperText, Snackbar, Alert, Tooltip
+    Typography, Paper, FormHelperText, Snackbar, Alert, Tooltip, LinearProgress
 } from '@mui/material';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import AcessPointModal from './acess-point';
 import NetworkFailures from '../components/network-failures-modal';
+import MDBox from "components/MDBox";
 
 const Wifi = ({ getProtocolData, protocolData, errors }) => {
 
@@ -31,24 +32,25 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
         network_name: protocolData.network_name ?? '',
         firewall_enabled: protocolData.firewall_enabled ?? false,
         log_monitoring_enabled: protocolData.log_monitoring_enabled ?? false,
+        redundancy_measures: protocolData.redundancy_measures ?? false,
+        intrusion_detection_system: protocolData.intrusion_detection_system ?? false,
+        firmware_integrity_check: protocolData.firmware_integrity_check ?? false,
         IP_range: protocolData.IP_range ?? '',
         already_implemented: protocolData.already_implemented ?? false,
         backbone_network_speed_in_Mpbs: protocolData.backbone_network_speed_in_Mpbs,
         ISP_connection_speed_in_Mpbs: protocolData.ISP_connection_speed_in_Mpbs,
-        bandwidthInMbps: protocolData.bandwidthInMbps,
         riskAssessmentId: protocolData.riskAssessmentId ?? null,
         network_details: {
             deployment_details: {
                 access_points: protocolData?.network_details?.deployment_details?.access_points ?? [],
-                area_coverage_in_square_meters: protocolData?.network_details?.deployment_details?.area_coverage_in_square_meters ?? '',
                 placement: protocolData?.network_details?.deployment_details?.placement ?? '',
-                level_of_interference: protocolData?.network_details?.deployment_details?.level_of_interference ?? '',
-                typical_latency_in_ms: protocolData?.network_details?.deployment_details?.typical_latency_in_ms ?? '',
                 lifetime_in_years: protocolData?.network_details?.deployment_details?.lifetime_in_years ?? '',
+                wifi_topology_type: protocolData?.network_details?.deployment_details?.wifi_topology_type ?? 'SingleAP'
             },
             network_failures: protocolData?.network_details?.network_failures ?? [],
-            other_connected_devices: '',
-        }
+            other_connected_devices: protocolData?.network_details?.other_connected_devices ?? "0"
+        },
+        tvra_input: protocolData.tvra_input ?? []
     });
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -212,6 +214,100 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
         }));
     };
 
+    // Handle Upload TVRA
+
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadResult, setUploadResult] = useState(null);
+
+    const fileInputRef = useRef(null);
+
+    const handleUpload = () => {
+        fileInputRef.current.click();
+    };
+
+    const handleFileChange = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.readAsText(file);
+            reader.onload = async () => {
+                try {
+                    var parsedData;
+                    try {
+                        parsedData = JSON.parse(reader.result);
+                    } catch
+                    {
+                        throw new Error('Not a valid json file');
+                    }
+
+                    var report = parsedData.report;
+
+                    if (!report || !Array.isArray(report)) {
+
+                        throw new Error('Uploaded file must contain an array.');
+                    }
+
+                    const totalItems = report.length;
+
+                    let successCount = 0;
+                    let failureCount = 0;
+
+                    setUploading(true);
+                    setUploadProgress(0);
+                    setUploadResult(null);
+
+                    wifiAnswers.tvra_input = [];
+
+                    for (let i = 0; i < totalItems; i++) {
+
+                        const tvraItem = report[i];
+
+                        try {
+
+                            const isValidFormat = 
+                                typeof tvraItem.host === 'string' &&
+                                typeof tvraItem.port === 'string' &&
+                                typeof tvraItem.severity === 'number' &&
+                                typeof tvraItem.qod === 'number' &&
+                                typeof tvraItem.text === 'string' ;
+                            
+                            if(!isValidFormat) {
+
+                                failureCount++;
+                                continue;
+                            }
+                            
+                            wifiAnswers.tvra_input.push(tvraItem);
+                            successCount++;
+
+                        } catch (error) {
+                            failureCount++;
+                        }
+
+                        setUploadProgress(Math.round(((i + 1) / totalItems) * 100));
+                    }
+
+                    setUploadResult({ success: successCount, failed: failureCount });
+                } catch (error) {
+                    setSnackbarMessage(error.message);
+                    setSnackbarOpen(true);
+                    setUploadResult({ success: 0, failed: 0 });
+                } finally {
+                    setUploading(false);
+                    event.target.value = '';
+                }
+            };
+            reader.onerror = () => {
+                setSnackbarMessage("Error reading the file");
+                setSnackbarOpen(true);
+
+                event.target.value = '';
+                setUploading(false);
+            };
+        }
+    };
+
 
     return (
         <Grid container spacing={2}>
@@ -293,6 +389,57 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
                                 />
                             }
                             label={'Log Monitor Enabled'}
+                        />
+                    </FormControl>
+                </Tooltip>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <Tooltip title="Enable this checkbox to indicate if redundancy measures are in place.">
+                    <FormControl fullWidth>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    inputProps={{ 'aria-label': 'Redundancy Measures' }}
+                                    name='redundancy_measures'
+                                    checked={wifiAnswers.redundancy_measures}
+                                    onChange={handleCheckboxChange}
+                                />
+                            }
+                            label={'Redundancy Measures'}
+                        />
+                    </FormControl>
+                </Tooltip>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <Tooltip title="Enable this checkbox to indicate the presence of an intrusion detection system.">
+                    <FormControl fullWidth>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    inputProps={{ 'aria-label': 'Intrusion Detection System' }}
+                                    name='intrusion_detection_system'
+                                    checked={wifiAnswers.intrusion_detection_system}
+                                    onChange={handleCheckboxChange}
+                                />
+                            }
+                            label={'Intrusion Detection System'}
+                        />
+                    </FormControl>
+                </Tooltip>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <Tooltip title="Enable this checkbox to indicate if firmware integrity checks are performed.">
+                    <FormControl fullWidth>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    inputProps={{ 'aria-label': 'Firmware Integrity Check' }}
+                                    name='firmware_integrity_check'
+                                    checked={wifiAnswers.firmware_integrity_check}
+                                    onChange={handleCheckboxChange}
+                                />
+                            }
+                            label={'Firmware Integrity Check'}
                         />
                     </FormControl>
                 </Tooltip>
@@ -392,39 +539,39 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
                     ))}
             </Grid>
             <Grid item xs={12} sm={6}>
-                <Tooltip title="Enter the total area coverage of the network in square meters.">
+                <Tooltip title="Other Connected Devices.">
                     <FormControl fullWidth>
                         <TextField
                             type='number'
-                            label='Area Coverage in Meters'
+                            label='Other Connected Devices'
                             id='6'
-                            value={wifiAnswers?.network_details?.deployment_details?.area_coverage_in_square_meters}
-                            name='network_details.deployment_details.area_coverage_in_square_meters'
+                            value={wifiAnswers?.network_details?.other_connected_devices}
+                            name='network_details.other_connected_devices'
                             onChange={handleInputChange}
-                            error={!!errors.area_coverage_in_square_meters}
-                            helperText={errors.area_coverage_in_square_meters ?? ''}
+                            error={!!errors.other_connected_devices}
+                            helperText={errors.other_connected_devices ?? ''}
                         />
                     </FormControl>
                 </Tooltip>
             </Grid>
             <Grid item xs={12} sm={6}>
-                <Tooltip title="Specify the overall level of interference in the network environment.">
+                <Tooltip title="Specify the topology type.">
                     <FormControl fullWidth>
-                        <InputLabel>{'Level Of Interference'}</InputLabel>
+                        <InputLabel>{'Topology Type'}</InputLabel>
                         <Select
-                            label={'Level Of Interference'}
+                            label={'Topology Type'}
                             id='7'
-                            value={wifiAnswers?.network_details?.deployment_details?.level_of_interference}
-                            name='network_details.deployment_details.level_of_interference'
+                            value={wifiAnswers?.network_details?.deployment_details?.wifi_topology_type}
+                            name='network_details.deployment_details.wifi_topology_type'
                             onChange={(e) => handleInputChange(e)}
-                            error={!!errors['network_details.deployment_details.level_of_interference']}
+                            error={!!errors['network_details.deployment_details.wifi_topology_type']}
                         >
-                            <MenuItem key={'low'} value={'low'}>{'Low'}</MenuItem>
-                            <MenuItem key={'medium'} value={'medium'}>{'Medium'}</MenuItem>
-                            <MenuItem key={'high'} value={'high'}>{'High'}</MenuItem>
+                            <MenuItem key={'SingleAP'} value={'SingleAP'}>{'SingleAP'}</MenuItem>
+                            <MenuItem key={'Star'} value={'Star'}>{'Star'}</MenuItem>
+                            <MenuItem key={'Mesh'} value={'Mesh'}>{'Mesh'}</MenuItem>
                         </Select>
-                        {errors.level_of_interference && (
-                            <FormHelperText sx={{ color: 'red' }}>{errors.level_of_interference}</FormHelperText>
+                        {errors.wifi_topology_type && (
+                            <FormHelperText sx={{ color: 'red' }}>{errors.wifi_topology_type}</FormHelperText>
                         )}
                     </FormControl>
                 </Tooltip>
@@ -441,22 +588,6 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
                             onChange={handleInputChange}
                             error={!!errors.lifetime_in_years}
                             helperText={errors.lifetime_in_years ?? ''}
-                        />
-                    </FormControl>
-                </Tooltip>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-                <Tooltip title="Provide the typical round-trip time latency for the network in milliseconds.">
-                    <FormControl fullWidth>
-                        <TextField
-                            type='number'
-                            label='Typical Latency RTT In Ms'
-                            id='9'
-                            value={wifiAnswers?.network_details?.deployment_details?.typical_latency_in_ms}
-                            name='network_details.deployment_details.typical_latency_in_ms'
-                            onChange={handleInputChange}
-                            error={!!errors.typical_latency_in_ms}
-                            helperText={errors.typical_latency_in_ms ?? ''}
                         />
                     </FormControl>
                 </Tooltip>
@@ -481,22 +612,6 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
                         )}                </FormControl>
                 </Tooltip>
 
-            </Grid>
-            <Grid item xs={12} sm={6}>
-            <Tooltip title="Enter the bandwidth capacity of the network in Megabits per second.">
-                <FormControl fullWidth>
-                    <TextField
-                        type='number'
-                        label='Bandwidth In Mbps'
-                        name='bandwidthInMbps'
-                        id='11'
-                        value={wifiAnswers.bandwidthInMbps}
-                        onChange={handleInputChange}
-                        error={!!errors.bandwidthInMbps}
-                        helperText={errors.bandwidthInMbps ?? ''}
-                    />
-                </FormControl>
-                </Tooltip>
             </Grid>
             <Grid item xs={12} sm={6}>
                 <Button
@@ -543,6 +658,27 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
                     ))
                 }
             </Grid>
+            <Grid item xs={12} sm={6}>
+                <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+                <Button
+                    variant="outlined"
+                    onClick={() => handleUpload()}
+                    style={{ color: 'black', borderColor: 'black', width: '100%', height: '56px' }}>
+                    {'UPLOAD TVRA INPUT'}
+                </Button>
+                {uploading && (
+                    <MDBox mt={4} px={2}>
+                        <Typography variant="body2" color="textSecondary">Uploading Devices... ({uploadProgress}%)</Typography>
+                        <LinearProgress variant="determinate" value={uploadProgress} />
+                    </MDBox>
+                )}
+                {uploadResult && (
+                    <MDBox mt={2} px={2}>
+                        <Typography variant="body2" color="success.main">Successfully imported: {uploadResult.success}</Typography>
+                        <Typography variant="body2" color="error.main">Failed to import: {uploadResult.failed}</Typography>
+                    </MDBox>
+                )}
+            </Grid>
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>
                     {snackbarMessage}
@@ -558,3 +694,4 @@ const Wifi = ({ getProtocolData, protocolData, errors }) => {
 };
 
 export default Wifi;
+

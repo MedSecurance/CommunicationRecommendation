@@ -23,6 +23,18 @@ export const encryptionItems = {
     "_802_11ax": { "_2_4GHz" : [ OPEN , WPA3] , "_5GHz" : [ OPEN , WPA3] ,  "_6GHz" : [ OPEN , WPA3] },
 }
 
+export const gsmGenerationsMapping = (generation) => {
+    
+    const mapping = {
+        "ThreeG": "3G",
+        "FourG": "4G",
+        "FiveG": "5G"
+    };
+
+    return mapping[generation] || generation;
+
+}
+
 
 
 

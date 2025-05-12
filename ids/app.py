@@ -17,7 +17,7 @@ if not os.path.exists(PCAP_FOLDER):
     os.makedirs(PCAP_FOLDER)
 
 st.set_page_config(
-    page_title="Medsecurance Monitor Matrix", 
+    page_title="Medsecurance Intrusion Detection System (IDS)", 
     page_icon="👁️‍🗨️", 
     layout="wide", 
     # initial_sidebar_state="expanded", 
@@ -28,7 +28,7 @@ lc, rc = st.columns([1, 4], vertical_alignment="bottom")
 with lc:
     st.image("static/MedSec_logo.png")
 with rc:
-    st.title('Medsecurance Monitor Matrix')
+    st.title('Medsecurance Intrusion Detection System (IDS)')
 st.divider()
 
 with st.form("my-form", clear_on_submit=True):

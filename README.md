@@ -49,8 +49,6 @@ __IMPORTANT NOTE__: This tool is only supported on the Linux version of docker d
      - `POSTGRES_USER`: The database user that will be created during the database first startup.
      - `POSTGRES_PASSWORD`: The password of the database user that will be created during the database first startup.
      - `DB_CONNECTION_STRING`: The connection string of the database.
-     - `PLATFORM_ADMIN_EMAIL`: The email of the user that will be created as admin during the platform's first startup.
-     - `PLATFORM_ADMIN_PASSWORD`: The password of the admin that will be created as admin during the platform's first startup.
      - `EMAIL_HOST`: The host of your mail server (i.e. `smtp.gmail.com`).
      - `EMAIL_HOST_PORT`: The port of the host of your mail server.
      - `EMAIL_SENDER_EMAIL`: The sender email (i.e. no-reply@something.com).
@@ -61,6 +59,8 @@ __IMPORTANT NOTE__: This tool is only supported on the Linux version of docker d
      - `ADMIN_EMAIL`: A valid email address for the network administrator
      - `UPDATE_DELAY_MINUTES`: Defines how often the tool will request information for unknown devices on the network from the device manager module. Default is 1 minute.
      - `EMAIL_DELAY_DAYS`: How frequently the tool will send an unknown device email alert to the `ADMIN_EMAIL` in days. Default is 1 day.
+     - `KEYCLOAK_BACKEND_URL`: The URL of the Keycloak server. This is required for the `backend` application to communicate with the Keycloak server.
+     - `REACT_APP_KEYCLOAK_URL`: The URL of the Keycloak server. This is required for the `frontend` application to communicate with the Keycloak server.
 
 3. Build and start the Docker containers:
    ```bash

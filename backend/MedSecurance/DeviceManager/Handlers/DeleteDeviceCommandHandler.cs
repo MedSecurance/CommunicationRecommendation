@@ -5,6 +5,7 @@ using MedSecurance.ActivityLog.Models.Enums;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
 using MedSecurance.DeviceManager.Commands;
 using MedSecurance.DeviceManager.Repositories.Interfaces;
+using MedSecurance.Extensions;
 
 namespace MedSecurance.DeviceManager.Handlers;
 
@@ -25,6 +26,7 @@ public class DeleteDeviceCommandHandler(IDeviceRepository repository,
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId, 
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLogCategory.DeviceManagement, 
             Action = ActivityLogAction.Delete,
             Details = $"Device with id {request.Id} has been deleted"

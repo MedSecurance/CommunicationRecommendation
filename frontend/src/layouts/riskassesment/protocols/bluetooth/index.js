@@ -34,6 +34,8 @@ const Bluetooth = ({ getProtocolData, protocolData, errors }) => {
         access_control_mechanism: protocolData.access_control_mechanism ?? '',
         backbone_network_speed_in_mpbs: protocolData.backbone_network_speed_in_mpbs ?? '',
         riskAssessmentId: protocolData.riskAssessmentId ?? null,
+        in_transit: protocolData.in_transit ?? false,
+        at_rest: protocolData.at_rest ?? false,
         mesh_details: {
             deployment_details: {
                 topology_type: protocolData?.mesh_details?.deployment_details?.topology_type ?? '',
@@ -44,7 +46,8 @@ const Bluetooth = ({ getProtocolData, protocolData, errors }) => {
                 lifetime_in_years: protocolData?.mesh_details?.deployment_details?.lifetime_in_years ?? '',
                 level_of_interference: protocolData?.mesh_details?.deployment_details?.level_of_interference ?? '',
             },
-            network_failures: protocolData?.mesh_details?.network_failures ?? []
+            network_failures: protocolData?.mesh_details?.network_failures ?? [],
+            other_connected_devices: protocolData?.mesh_details?.other_connected_devices ?? "0"
         }
     });
 
@@ -65,7 +68,7 @@ const Bluetooth = ({ getProtocolData, protocolData, errors }) => {
 
     useEffect(() => {
         if (errors.access_points && !bluetoothAnswers.mesh_details.deployment_details.access_points.length) {
-            setSnackbarMessage("Please add access points");
+            setSnackbarMessage("Please add HUB");
             setSnackbarOpen(true);
             errors.access_points = undefined;
         }
@@ -472,6 +475,22 @@ const Bluetooth = ({ getProtocolData, protocolData, errors }) => {
                 </Tooltip>
             </Grid>
             <Grid item xs={12} sm={6}>
+                <Tooltip title="Other Connected Devices.">
+                    <FormControl fullWidth>
+                        <TextField
+                            type='number'
+                            label='Other Connected Devices'
+                            id='64'
+                            value={bluetoothAnswers?.mesh_details?.other_connected_devices}
+                            name='mesh_details.other_connected_devices'
+                            onChange={handleInputChange}
+                            error={!!errors.other_connected_devices}
+                            helperText={errors.other_connected_devices ?? ''}
+                        />
+                    </FormControl>
+                </Tooltip>
+            </Grid>
+            <Grid item xs={12} sm={6}>
                 <Tooltip title="Select the level of interference affecting the mesh network.">
                     <FormControl fullWidth>
                         <InputLabel>{'Level Of Interference'}</InputLabel>
@@ -610,6 +629,41 @@ const Bluetooth = ({ getProtocolData, protocolData, errors }) => {
                         </li>
                     ))
                 }
+            </Grid>
+            <Grid item xs={12}>
+                <Box component={Paper} elevation={2} p={2} style={{ textAlign: 'center', gridColumn: '1 / -1' }} >
+                    <Typography variant="h6">{'Data Privacy Measures'}</Typography>
+                </Box>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                inputProps={{ 'aria-label': 'At Rest' }}
+                                name='at_rest'
+                                checked={bluetoothAnswers.at_rest}
+                                onChange={handleCheckboxChange}
+                            />
+                        }
+                        label={'At Rest'}
+                    />
+                </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                inputProps={{ 'aria-label': 'In Transitt' }}
+                                name='in_transit'
+                                checked={bluetoothAnswers.in_transit}
+                                onChange={handleCheckboxChange}
+                            />
+                        }
+                        label={'In Transit'}
+                    />
+                </FormControl>
             </Grid>
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>

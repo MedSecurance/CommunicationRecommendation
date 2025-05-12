@@ -24,7 +24,6 @@ const AuthenticatedLayout = ({
 }) => {
   const [controller, dispatch] = useMaterialUIController();
   const { miniSidenav, openConfigurator } = controller;
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

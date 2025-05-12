@@ -9,8 +9,10 @@ const loraWanApiData = (loraWanData) => {
             firmwareIntegrityCheck: loraWanData.firmware_integrity_check,
             otherConnectedDevices: loraWanData.other_connected_devices,
             attacks: [],
-            dataPrivacyMeasures: { atRest: true, inTransit: true },
+            dataPrivacyMeasures: { atRest: loraWanData.at_rest, inTransit: loraWanData.in_transit },
             securityAuditFrequencyInYears: loraWanData.security_audit_frequency_in_years,
+            riskAssessmentId: loraWanData.riskAssessmentId ?? null,
+            riskAssessmentBody: JSON.stringify(loraWanData),
             networkDetails: {
                 deploymentCountry: loraWanData.network_details.deployment_country,
                 lifetimeInYears: loraWanData.network_details.lifetime_in_years,
@@ -63,10 +65,32 @@ const loraWanApiData = (loraWanData) => {
             requestData.networkDetails.gateways.push(gatewayRequest);
         });
 
+        requestData.NetworkFailures = mapNetworkFailures(loraWanData.network_details.network_failures);
+
         return requestData;
     }
 
 };
+
+function mapNetworkFailures(network_failures) {
+
+    var mappedNetworkFailures = [];
+
+    network_failures?.forEach(failure => {
+        var requestNetworkFailure = {
+            CauseOfFailure: failure.cause_of_failure,
+            DowntimeInMinutes: failure.downtime_in_minutes,
+            TimeToRepairInMinutes: failure.time_to_repair_in_minutes,
+            FailureHandling: failure.failure_handling
+        };
+
+        mappedNetworkFailures.push(requestNetworkFailure);
+
+    });
+
+    return mappedNetworkFailures;
+
+}
 
 
 export default loraWanApiData;

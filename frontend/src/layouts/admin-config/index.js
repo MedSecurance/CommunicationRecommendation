@@ -1,26 +1,20 @@
-import React, {useState, useEffect, useContext} from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
-    Grid, Card, Typography, TextField
+    Grid, Card, Typography, TextField, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
-import DataTable from "examples/Tables/DataTable";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
-import {GetAdminConfigs, UpdateAdminConfig} from "services/admin-config-service";
+import { GetAdminConfigs, UpdateAdminConfig } from "services/admin-config-service";
 import Icon from "@mui/material/Icon";
-import {AuthContext} from '../../auth/AuthContext';
+import { KeycloakContext } from '../../keycloak-provider';
 
 const AdminConfig = () => {
-    const {getAuthHeaders} = useContext(AuthContext);
-    const [rows, setRows] = useState([]);
+    const { getAuthHeaders } = useContext(KeycloakContext);
 
-    const columns = [
-        {Header: "Protocol", accessor: "protocol", align: "left", sortable: true},
-        {Header: "Property Name", accessor: "property", align: "left", sortable: true},
-        {Header: "Value", accessor: "value", align: "center", sortable: true},
-        {Header: "Action", accessor: "action", align: "center", sortable: false}
-    ];
+    const [groupedConfigs, setGroupedConfigs] = useState({});
 
     useEffect(() => {
         fetchData(getAuthHeaders);
@@ -29,131 +23,106 @@ const AdminConfig = () => {
     const fetchData = async (getAuthHeaders) => {
         try {
             const response = await GetAdminConfigs(getAuthHeaders);
-            setRows(response.adminConfigs.map(adminConfig => ({
-                protocol: (
-                    <Typography display="block" variant="caption" fontWeight="medium">
-                        {adminConfig.protocol}
-                    </Typography>
-                ),
-                property: (
-                    <Typography display="block" variant="caption" fontWeight="medium">
-                        {adminConfig.property}
-                    </Typography>
-                ),
-                value: adminConfig.value,
-                isEditing: false
-            })));
+            const grouped = response.adminConfigs.reduce((acc, config) => {
+                if (!acc[config.protocol]) {
+                    acc[config.protocol] = [];
+                }
+                acc[config.protocol].push({
+                    ...config,
+                    isEditing: false
+                });
+                return acc;
+            }, {});
+            setGroupedConfigs(grouped);
         } catch (error) {
             console.error('Error fetching data:', error);
         }
     };
 
-    const handleEdit = (property, protocol) => {
-        setRows(rows.map(row =>
-            row.property.props.children === property &&
-            row.protocol.props.children === protocol
-                ? {...row, isEditing: true}
-                : row
-        ));
+    const handleEdit = (protocol, property) => {
+        setGroupedConfigs(prev => ({
+            ...prev,
+            [protocol]: prev[protocol].map(config =>
+                config.property === property ? { ...config, isEditing: true } : config
+            )
+        }));
     };
 
-    const handleValueChange = (e, property, protocol) => {
+    const handleValueChange = (e, protocol, property) => {
         const newValue = e.target.value;
-        if (Number(newValue) < 0) {
-            alert("Negative numbers are not allowed."); // Real-time feedback
-            return;
-        }
-        setRows(rows.map(row =>
-            row.property.props.children === property &&
-            row.protocol.props.children === protocol
-                ? {...row, value: newValue}
-                : row
-        ));
+        setGroupedConfigs(prev => ({
+            ...prev,
+            [protocol]: prev[protocol].map(config =>
+                config.property === property ? { ...config, value: newValue } : config
+            )
+        }));
     };
 
-    const handleSave = async (adminConfig, newValue) => {
-
+    const handleSave = async (protocol, property, newValue) => {
         if (Number(newValue) < 0) {
-            alert("Negative numbers are not allowed."); // Show an alert or any error indication
-            // Optionally, reset the value to the previous one
-            setRows(rows.map(row =>
-                row.property.props.children === adminConfig.property.props.children &&
-                row.protocol.props.children === adminConfig.protocol.props.children
-                    ? {...row, value: adminConfig.value, isEditing: false}
-                    : row
-            ));
+            alert("Negative numbers are not allowed.");
             return;
         }
-
         const payload = {
-            updatedAdminConfig: {
-                protocol: adminConfig.protocol.props.children,
-                property: adminConfig.property.props.children,
-                value: newValue
-            }
+            updatedAdminConfig: { protocol, property, value: newValue }
         };
-
         await UpdateAdminConfig(payload, getAuthHeaders);
-        setRows(rows.map(row =>
-            row.property.props.children === adminConfig.property.props.children &&
-            row.protocol.props.children === adminConfig.protocol.props.children
-                ? {...row, isEditing: false, value: newValue}
-                : row
-        ));
+        setGroupedConfigs(prev => ({
+            ...prev,
+            [protocol]: prev[protocol].map(config =>
+                config.property === property ? { ...config, isEditing: false, value: newValue } : config
+            )
+        }));
     };
 
     return (
         <DashboardLayout>
-            <DashboardNavbar/>
+            <DashboardNavbar />
             <MDBox pt={6} pb={3}>
                 <Grid container spacing={6}>
                     <Grid item xs={12}>
                         <Card>
-                            <MDBox
-                                mx={2}
-                                mt={-3}
-                                py={3}
-                                px={2}
-                                variant="gradient"
-                                bgColor="info"
-                                borderRadius="lg"
-                                coloredShadow="info"
-                            >
-                                <MDTypography variant="h6" color="white">
-                                    Administrator's Configuration Panel
-                                </MDTypography>
+                            <MDBox mx={2} mt={-3} py={3} px={2} variant="gradient" bgColor="info" borderRadius="lg" coloredShadow="info">
+                                <MDBox p={2} display="flex" justifyContent="space-between" alignItems="center">
+                                    <MDTypography variant="h6" color="white">Administrator's Configuration Panel</MDTypography>
+                                </MDBox>
                             </MDBox>
                             <MDBox pt={3}>
-                                <DataTable
-                                    table={{
-                                        columns,
-                                        rows: rows.map(row => ({
-                                            ...row,
-                                            value: row.isEditing ? (
-                                                <TextField
-                                                    value={row.value}
-                                                    onChange={(e) => handleValueChange(e, row.property.props.children, row.protocol.props.children)}
-                                                    onBlur={() => handleSave(row, row.value)}
-                                                />
-                                            ) : (
-                                                <Typography display="block" variant="caption" fontWeight="medium">
-                                                    {row.value}
-                                                </Typography>
-                                            ),
-                                            action: (
-                                                <MDTypography component="a" href="#"
-                                                              onClick={() => handleEdit(row.property.props.children, row.protocol.props.children)}
-                                                              color="text">
-                                                    <Icon>edit</Icon>
-                                                </MDTypography>
-                                            ),
-                                        })),
-                                    }}
-                                    isSorted={true}
-                                    entriesPerPage={true}
-                                    showTotalEntries={true}
-                                    noEndBorder
-                                />
+                                {Object.keys(groupedConfigs).map(protocol => (
+                                    <Accordion key={protocol}>
+                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                            <Typography variant="h6">{protocol}</Typography>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            {groupedConfigs[protocol].map(config => (
+                                                <Grid container spacing={1} alignItems="center" key={config.property}>
+                                                    <Grid item xs={5}>
+                                                        <Typography>{config.property}</Typography>
+                                                    </Grid>
+                                                    <Grid item xs={5}>
+                                                        {config.isEditing ? (
+                                                            <TextField
+                                                                value={config.value}
+                                                                onChange={(e) => handleValueChange(e, protocol, config.property)}
+                                                                onBlur={() => handleSave(protocol, config.property, config.value)}
+                                                            />
+                                                        ) : (
+                                                            <Typography>Value: {config.value}</Typography>
+                                                        )}
+                                                    </Grid>
+                                                    <Grid item xs={2}>
+                                                        <Icon
+                                                            style={{ cursor: 'pointer' }}
+                                                            onClick={() => handleEdit(protocol, config.property)}
+                                                        >
+                                                            edit
+                                                        </Icon>
+                                                    </Grid>
+                                                </Grid>
+                                            ))}
+                                        </AccordionDetails>
+                                    </Accordion>
+                                ))}
                             </MDBox>
                         </Card>
                     </Grid>
@@ -164,3 +133,4 @@ const AdminConfig = () => {
 };
 
 export default AdminConfig;
+

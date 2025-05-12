@@ -20,5 +20,5 @@ public record EvaluateBluetoothCommand(
     BluetoothAccessControlMechanism AccessControlMechanism,
     int BackboneNetworkSpeedInMpbs,
     BluetoothNetworkDetails NetworkDetails
-    ) : IRequest<EvaluateBluetoothCommandResponse>;
+    ) : IRequest<EvaluateCommandResponse>;
     

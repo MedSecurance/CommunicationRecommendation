@@ -1,6 +1,6 @@
 function isPositiveNumber(str) {
     // Check if the string is a number and is greater than zero
-    return !isNaN(str) && parseFloat(str) > 0;
+    return !isNaN(str) && parseFloat(str) >= 0;
 }
 
 export const validateNumberInput = (inputFieldValue , inputFieldName , errorsArray) => { 

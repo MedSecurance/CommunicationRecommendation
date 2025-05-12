@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MediatR;
 using MedSecurance.ActivityLog.Models;
 using MedSecurance.ActivityLog.Repositories.Interfaces;
+using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Commands.Lorawan;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
@@ -49,11 +50,16 @@ public class EvaluateLorawanCommandHandler(
         await activityLogRepository.CreateActivityLog(new ActivityLogEntity
         {
             UserId = userId,
+            UserFullName = httpContextAccessor.GetUserFullName(),
             Category = ActivityLog.Models.Enums.ActivityLogCategory.RiskAssessment,
             Action = ActivityLog.Models.Enums.ActivityLogAction.Execute,
             Details = $"{nameof(EvaluateLorawanCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
 
-        return new EvaluateCommandResponse(evaluatorResult.Suggestions);
+        return new EvaluateCommandResponse(
+            evaluatorResult.Mitigations,
+            evaluatorResult.SafeConfigs,
+            evaluatorResult.Replacements
+        );
     }
 }

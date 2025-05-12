@@ -6,20 +6,28 @@ const mapWifiDataToApiData = (wifiData) => {
         protocol: 0,
         firewallEnabled: wifiData.firewall_enabled,
         logMonitoringEnabled: wifiData.log_monitoring_enabled,
+        RedundancyMeasures : wifiData.redundancy_measures,
+        IntrusionDetectionSystem : wifiData.intrusion_detection_system ,
+        FirmwareIntegrityCheck : wifiData.firmware_integrity_check ,
         ipRange: wifiData.IP_range,
         backboneNetworkSpeedInMpbs: wifiData.backbone_network_speed_in_Mpbs ?? 0,
         ispConnectionSpeedInMpbs: wifiData.ISP_connection_speed_in_Mpbs ?? 0,
         placement: wifiData.network_details.deployment_details.placement,
         networkName: wifiData.network_name,
         riskAssessmentBody: JSON.stringify(wifiData),
+        alreadyImplemented : wifiData.already_implemented,
         riskAssessmentId: wifiData.riskAssessmentId ?? null,
         networkDetails: {
             WifiDeploymentDetails: {
                 accessPoints: [
-                ]
+                ],
+                lifetimeInYears : wifiData.network_details.deployment_details.lifetime_in_years,
+                topologyType : wifiData.network_details.deployment_details.wifi_topology_type
             },
-            NetworkFailures: []
-        }
+            NetworkFailures: [],
+            otherConnectedDevices : wifiData.network_details.other_connected_devices ?? 0
+        },
+        tvraCves : wifiData.tvra_input
     }
 
     wifiData.network_details.deployment_details.access_points.forEach(accessPoint => {
