@@ -55,8 +55,7 @@ __IMPORTANT NOTE__: This tool is only supported on the Linux version of docker d
      - `EMAIL_SENDER_PASSWORD`: The password of the sender email.
      - `EMAIL_SENDER_NAME`: The name of the sender to be shown on emails. Default is `Med Securance`
      - `REACT_APP_API_BASE_URL`: The URL of the MedSecurance backend server. This is required for the `frontend` application to communicate with the backend.
-     - `MEDSEC_URL`: The URL of the MedSecurance backend server. This is required for the system to communicate with the backend.
-     - `ADMIN_EMAIL`: A valid email address for the network administrator
+     - `ADMIN_EMAIL`: A valid email address for the network administrator. A valid email address for the network administrator. This email will receive notifications in case of intrusion detection events or unknown device detection.
      - `UPDATE_DELAY_MINUTES`: Defines how often the tool will request information for unknown devices on the network from the device manager module. Default is 1 minute.
      - `EMAIL_DELAY_DAYS`: How frequently the tool will send an unknown device email alert to the `ADMIN_EMAIL` in days. Default is 1 day.
      - `KEYCLOAK_BACKEND_URL`: The URL of the Keycloak server. This is required for the `backend` application to communicate with the Keycloak server.
@@ -67,8 +66,28 @@ __IMPORTANT NOTE__: This tool is only supported on the Linux version of docker d
    docker-compose up --build
    ```
 
-4. Access the application:
-  - Open your web browser and navigate to `http://localhost`.
+4. To access the different services use your web browser and navigate to the following URLs:
+  - `http://localhost` to access the Risk Assessment, Device Manager, System configuration options and log files (Based on the user role different options maybe visible)
+    - Default username: user@example.com
+    - Default password: password123
+  - `http://localhost:8081` to access the keycloak instance. 
+    - Default username: admin
+    - Default password: admin
+  - `http://localhost:33761/inspector_dashboard` to access the Monitor-Matrix tool
+  - `http://localhost:8501` to access the Intrusion Detection System (IDS)
+
+>[!Note]
+>To deploy individual components you can comment out individual services inside the `docker-compose.yaml` file as follow:
+>1. To deploy the core components you need to keep the following services:
+>   - postgress
+>   - backend
+>   - frontend
+>   - keycloak
+>2. To deploy the Monitor-Matrix service you only need to keep the Monitor-Matrix service section in your docker-deployment.yaml file. The assumption here is that the core components are already installed in a different machine. In this case you can access the service using the following URL: `http://<server-ip-address|domain-name>:33761/inspector_dashboard` 
+
+>[!IMPORTANT] 
+>For the deployment option 2 above see inline comments to properly configure Monitor-Matrix to properly communicate with the backend services.   
+
 
 Credits - The code of `monitor-matrix` is based on the following project:
 

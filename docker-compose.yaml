@@ -50,22 +50,27 @@ services:
       - backend
     ports:
       - "80:80"
-      
+
+  # Ideally monitor-matrix should be deployed within the network that you need to monitor 
+  # using docker on Linux based OS. For testing purposes the tool can also be deployed 
+  # locally under Windows and MAC OSes. See comments below for correct configuration.
   monitor-matrix:
-    # Uncomment the following for Linux deployment and comment the ports (see below)
+    # Uncomment the following line for Linux deployment.
     # network_mode: "host" 
     build:
       context: ./monitor-matrix
       dockerfile: Dockerfile
-      args:
-        MEDSEC_URL: ${MEDSEC_URL}
-        ADMIN_EMAIL: ${ADMIN_EMAIL}
-        UPDATE_DELAY_MINUTES: ${UPDATE_DELAY_MINUTES}
-        EMAIL_DELAY_DAYS: ${EMAIL_DELAY_DAYS}
     container_name: medsec-monitor-matrix
     volumes:
       - user-data:/app/user-data
-    # Comment the following two lines for Linux deployment when using "network_mode: host" above
+    environment:
+      # The BACKEND_URL should be based on the backend container name if deployed locally, 
+      # otherwise should be the IP address/URL of the backend server
+      BACKEND_URL: "http://medsec-backend:8080" # Current URL is for local deployment only.
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      UPDATE_DELAY_MINUTES: ${UPDATE_DELAY_MINUTES}
+      EMAIL_DELAY_DAYS: ${EMAIL_DELAY_DAYS}
+    # Comment the following two lines for Linux deployment when using "network_mode: host" above.
     ports:
       - "33761:33761"      
 
@@ -73,9 +78,9 @@ services:
     build:
       context: ./ids
       dockerfile: Dockerfile
-      args:
-        MEDSEC_URL: ${MEDSEC_URL}
-        ADMIN_EMAIL: ${ADMIN_EMAIL}
+    environment:
+      BACKEND_URL: "http://medsec-backend:8080" # Should be based on the backend container name 
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
     ports:
       - "8501:8501"
     container_name: medsec-ids

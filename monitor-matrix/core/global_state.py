@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MEDSEC_URL = os.environ.get("MEDSEC_URL", "localhost:8080")
+BACKEND_URL = os.environ.get("BACKEND_URL", "localhost:8080")
 UPDATE_DELAY = os.environ.get("UPDATE_DELAY_MINUTES", "1")
 EMAIL_DELAY = os.environ.get("UPDATE_DELAY_DAYS", "1")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "root@localhost")

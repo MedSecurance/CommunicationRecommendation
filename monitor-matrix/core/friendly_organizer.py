@@ -151,7 +151,7 @@ def add_product_info_to_devices():
 
 
 def send_notification_email(rec):
-    url = global_state.MEDSEC_URL + f'/email/send'
+    url = global_state.BACKEND_URL + f'/email/send'
     content = email_template%(rec['mac_addr'], datetime.datetime.today().year)
     data = {
         "recipient": global_state.ADMIN_EMAIL,
@@ -170,7 +170,7 @@ def send_notification_email(rec):
 
 def get_product_name_from_backend(macAddress: str) -> str:
     # Send an HTTP GET request to the Medsec backend server and ask for the device name
-    url = global_state.MEDSEC_URL + f'/device-manager/devices?macAddress={macAddress}'
+    url = global_state.BACKEND_URL + f'/device-manager/devices?macAddress={macAddress}'
     try:
         return common.http_request_medsec(
             method='get',

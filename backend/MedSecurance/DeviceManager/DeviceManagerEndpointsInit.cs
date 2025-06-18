@@ -20,8 +20,8 @@ public static class DeviceManagerEndpointsInit
                         networkName));
                 })
             .WithName("GetDevices")
-            .WithTags("Device Manager")
-            .RequireAuthorization("View");
+            .WithTags("Device Manager");
+            // .RequireAuthorization("View");
 
 
         app

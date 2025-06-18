@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MEDSEC_URL = os.environ.get("MEDSEC_URL", "localhost:8080")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "root@localhost")
+BACKEND_URL = os.environ.get("BACKEND_URL", "localhost:8080")
 
 PCAP_FOLDER = "backend/pcap"
 PCAP_SAVED_LOCATION = f"{PCAP_FOLDER}/uploaded.pcap"
@@ -81,7 +81,7 @@ with st.form("my-form", clear_on_submit=True):
         # Send email if an attack is detected
         if 1 in df['isAttack']:
             st.html(f"Attacks detected.<br/>Filename: {file.name}<br/>Send email to <a href='mailto: {ADMIN_EMAIL}'> {ADMIN_EMAIL} <a/>")
-            logic.send_notification_email(MEDSEC_URL, file.name, ADMIN_EMAIL)
+            logic.send_notification_email(BACKEND_URL, file.name, ADMIN_EMAIL)
             
     else:
         if submitted:
