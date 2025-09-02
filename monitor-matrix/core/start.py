@@ -40,7 +40,7 @@ def start_threads():
     core.common.SafeLoopThread(core.packet_processor.process_packet, sleep_time=0)
     core.common.SafeLoopThread(core.arp_spoofer.spoof_internet_traffic, sleep_time=5)
     core.common.SafeLoopThread(core.friendly_organizer.add_hostname_info_to_flows, sleep_time=5)
-    core.common.SafeLoopThread(core.friendly_organizer.add_product_info_to_devices, sleep_time=5)
+    core.common.SafeLoopThread(product_info_updater, sleep_time=5)
 
     core.common.log('Inspector started')
 
@@ -71,6 +71,12 @@ def init():
         pass
 
     clean_up()
+
+def product_info_updater():
+    while True:
+        token = global_state.token['access_token']
+        core.friendly_organizer.add_product_info_to_devices(token)
+        time.sleep(5)
 
 
 

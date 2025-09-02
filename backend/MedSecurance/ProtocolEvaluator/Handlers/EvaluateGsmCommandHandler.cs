@@ -8,6 +8,8 @@ using MedSecurance.ProtocolEvaluator.Commands.Gsm;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
+using MedSecurance.Services;
+using MedSecurance.Services.Models;
 
 namespace MedSecurance.ProtocolEvaluator.Handlers;
 
@@ -16,7 +18,8 @@ public class EvaluateGsmCommandHandler(
     IGsmEvaluator gsmEvaluator,
     IRiskAssessmentRepository riskAssessmentRepository,
     IHttpContextAccessor httpContextAccessor,
-    IActivityLogRepository activityLogRepository
+    IActivityLogRepository activityLogRepository,
+    IEvidenceManagerService evidenceManagerService
 ) : IRequestHandler<EvaluateGsmCommand, EvaluateCommandResponse>
 {
     public async Task<EvaluateCommandResponse> Handle(EvaluateGsmCommand request, CancellationToken cancellationToken)
@@ -54,11 +57,21 @@ public class EvaluateGsmCommandHandler(
             Action = ActivityLog.Models.Enums.ActivityLogAction.Execute,
             Details = $"{nameof(EvaluateGsmCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
-
-        return new EvaluateCommandResponse(
+        
+        var response = new EvaluateCommandResponse(
             evaluatorResult.Mitigations,
             evaluatorResult.SafeConfigs,
             evaluatorResult.Replacements
         );
+        
+        var riskAssessmentEvidence = new RiskAssessmentEvidence(
+            riskAssessment.Id, 
+            riskAssessment.Protocol, 
+            riskAssessment.NetworkName,
+            evaluatorResult
+        );
+        await evidenceManagerService.UploadRiskAssessmentEvidence(riskAssessmentEvidence);
+
+        return response;
     }
 }

@@ -6,6 +6,7 @@ using MedSecurance.ActivityLog.Repositories.Interfaces;
 using MedSecurance.Extensions;
 using MedSecurance.ProtocolEvaluator.Commands.RiskAssessment;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
+using MedSecurance.Services;
 
 namespace MedSecurance.ProtocolEvaluator.Handlers.RiskAssessment;
 
@@ -13,8 +14,9 @@ public class DeleteRiskAssessmentCommandHandler(
     IRiskAssessmentRepository repository,
     ILogger<DeleteRiskAssessmentCommandHandler> logger,
     IActivityLogRepository activityLogRepository,
-    IHttpContextAccessor httpContextAccessor)
-    : IRequestHandler<DeleteRiskAssessmentCommand>
+    IHttpContextAccessor httpContextAccessor,
+    IEvidenceManagerService evidenceManagerService
+) : IRequestHandler<DeleteRiskAssessmentCommand>
 {
     public async Task Handle(DeleteRiskAssessmentCommand request, CancellationToken cancellationToken)
     {
@@ -32,5 +34,7 @@ public class DeleteRiskAssessmentCommandHandler(
             Action = ActivityLogAction.Delete,
             Details = $"RiskAssessment with id {request.Id} has been deleted"
         });
+
+        await evidenceManagerService.DeleteRiskAssessmentEvidence(request.Id);
     }
 }

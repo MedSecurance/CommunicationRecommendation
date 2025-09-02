@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Email;
@@ -19,6 +20,7 @@ using MedSecurance.ProtocolEvaluator.Evaluators;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
 using MedSecurance.ProtocolEvaluator.Repository;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
+using MedSecurance.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -67,10 +69,18 @@ builder.Services.AddEmailClient();
 builder.Services.AddAlerts(builder.Configuration);
 builder.Services.AddScoped<IGsmEvaluator, GsmEvaluator>();
 builder.Services.AddScoped<IProtocolReplacementEvaluator, ProtocolReplacementEvaluator>();
+builder.Services.AddScoped<IEvidenceManagerService, EvidenceManagerService>();
 
 builder.Services.AddTransient<IClaimsTransformation, CustomClaimsTransformation>();
 
 builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+
+builder.Services.AddHttpClient("EvidenceManagerApi", client =>
+{
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.BaseAddress = new Uri(builder.Configuration["EvidenceManagerApi:BaseUrl"] ??
+                                 throw new Exception("EvidenceManagerApi:BaseUrl is null"));
+});
 
 // Add Swagger and configure the security definition for OAuth2.
 builder.Services.AddSwaggerGen(options =>
@@ -135,10 +145,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = false;
-        
+
         // Keycloak's metadata URL to automatically fetch public keys and other details
         options.MetadataAddress = builder.Configuration["Keycloak:MetadataAddress"] ?? string.Empty;
-        
+
         // Set the Audience, which should be the client ID of your confidential client in Keycloak
         options.Audience = builder.Configuration["Keycloak:ClientId"];
 
@@ -146,11 +156,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Keycloak:Issuer"], // Typically: "http://<keycloak-server>/realms/<realm-name>"
+            ValidIssuer =
+                builder.Configuration["Keycloak:Issuer"], // Typically: "http://<keycloak-server>/realms/<realm-name>"
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Keycloak:ClientId"], // Match your client ID in Keycloak
             // Accept both the frontend and backend audience
-            ValidAudiences = new List<string> { "med-sec-portal", "client-confidential", "account" }, // Add the valid audiences here
+            ValidAudiences = new List<string>
+                { "med-sec-portal", "client-confidential", "account" }, // Add the valid audiences here
             ValidateLifetime = true, // Validate token expiration
             ClockSkew = TimeSpan.Zero, // Optional: reduce default clock skew to zero
         };
@@ -159,8 +171,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"))
-    .AddPolicy("UserAdmin", policy => policy.RequireRole("Admin" , "User"))
-    .AddPolicy("Create", policy => policy.RequireRole("User", "Admin" , "SecurityAnalyst" , "RegulatoryBodies"))
+    .AddPolicy("UserAdmin", policy => policy.RequireRole("Admin", "User"))
+    .AddPolicy("Create", policy => policy.RequireRole("User", "Admin", "SecurityAnalyst", "RegulatoryBodies"))
     .AddPolicy("Delete", policy => policy.RequireRole("User", "Admin"))
     .AddPolicy("Update", policy => policy.RequireRole("User", "Admin"))
     .AddPolicy("View", policy => policy.RequireRole("User", "Admin", "SecurityAnalyst", "RegulatoryBodies"));
@@ -181,7 +193,6 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     dbContext.Database.Migrate();
-    
 }
 
 // Configure the HTTP request pipeline.

@@ -60,6 +60,7 @@ __IMPORTANT NOTE__: This tool is only supported on the Linux version of docker d
      - `EMAIL_DELAY_DAYS`: How frequently the tool will send an unknown device email alert to the `ADMIN_EMAIL` in days. Default is 1 day.
      - `KEYCLOAK_BACKEND_URL`: The URL of the Keycloak server. This is required for the `backend` application to communicate with the Keycloak server.
      - `REACT_APP_KEYCLOAK_URL`: The URL of the Keycloak server. This is required for the `frontend` application to communicate with the Keycloak server.
+     - `EVIDENCE_MANAGER_API_URL`: The URL of the Evidence Manager API server. This is required for the `backend` application to communicate with the Evidence Manager API server.
 
 3. Build and start the Docker containers:
    ```bash
@@ -83,7 +84,7 @@ __IMPORTANT NOTE__: This tool is only supported on the Linux version of docker d
 >   - backend
 >   - frontend
 >   - keycloak
->2. To deploy the Monitor-Matrix service you only need to keep the Monitor-Matrix service section in your docker-deployment.yaml file. The assumption here is that the core components are already installed in a different machine. In this case you can access the service using the following URL: `http://<server-ip-address|domain-name>:33761/inspector_dashboard` 
+>2. To deploy the Monitor-Matrix service you only need to keep the Monitor-Matrix service section in your docker-deployment.yaml file. The assumption here is that the core components are already installed in a >different machine. In this case you can access the service using the following URL: `http://<server-ip-address|domain-name>:33761/inspector_dashboard` 
 
 >[!IMPORTANT] 
 >For the deployment option 2 above see inline comments to properly configure Monitor-Matrix to properly communicate with the backend services.   

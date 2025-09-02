@@ -8,12 +8,28 @@ import core.deferred_action as deferred_action
 import core.config as config
 import ui.common as common
 from datetime import datetime
-
+from core.auth_refresh import refresh_token_loop
+import threading
+import auth
+import core.global_state as global_state
 
 # Generated from https://colordesigner.io/random-color-generator
 COLORS = ['#bf2c1c', '#2e1591', '#ea09d0', '#56db39', '#ddd14b', '#cec10c', '#68f43d', '#c6ef0e', '#076361', '#30ba72', '#56eab6', '#f4904e', '#3947dd', '#db6c60', '#c605b3', '#da63ed', '#609b18', '#ff54b7', '#c6e52d', '#a3061b', '#f7252f', '#ef5689', '#b650d8', '#27ea3e', '#ac08dd', '#c510ce', '#c4d321', '#3474a8', '#15d86a', '#d862e5', '#430c9b', '#e863b3', '#5cd6a9', '#a032ef', '#dee064', '#487ec4', '#57d644', '#e54c00', '#137200', '#b44ce8']
 
+def main():
+    token = auth.ensure_user_logged_in()
 
+    with global_state.token_lock:
+        global_state.token['access_token'] = token['access_token']
+        global_state.token['refresh_token'] = token['refresh_token']
+        global_state.token['expires_at'] = token['expires_at']
+
+    # Start refresh thread only once
+    if 'refresh_thread_started' not in st.session_state:
+        threading.Thread(target=refresh_token_loop, daemon=True).start()
+        st.session_state['refresh_thread_started'] = True
+
+    return
 
 @st.cache_data(ttl=2, show_spinner=False)
 def get_device_list():
@@ -375,7 +391,7 @@ def show_no_data(type_name=''):
 
 
 
-
+main()
 template.show()
 
 mac_addr = None

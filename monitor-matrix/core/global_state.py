@@ -9,6 +9,14 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+token = {
+    'access_token': '',
+    'refresh_token': '',
+    'expires_at': 0
+}
+
+token_lock = threading.Lock()
+
 MEDSEC_URL = os.environ.get("MEDSEC_URL", "localhost:8080")
 BACKEND_URL = os.environ.get("BACKEND_URL", "localhost:8080")
 UPDATE_DELAY = os.environ.get("UPDATE_DELAY_MINUTES", "1")

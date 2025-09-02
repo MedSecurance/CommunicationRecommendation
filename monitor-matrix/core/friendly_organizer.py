@@ -3,10 +3,10 @@ Add friendly names to entities.
 
 """
 import core.model as model
+import streamlit as st
 import core.common as common
 import core.global_state as global_state
 import core.networking as networking
-import core.config as config
 from core.oui_parser import get_vendor
 from core.ttl_cache import ttl_cache
 from core.email_alert_template import email_template
@@ -17,7 +17,6 @@ import tldextract
 import json
 import socket
 import datetime
-
 
 ip_country_parser = geoip2.database.Reader(
     os.path.join(
@@ -38,10 +37,9 @@ tracker_json_list = [
 ]
 
 
-def add_product_info_to_devices():
+def add_product_info_to_devices(token : str):
 
     updated_row_count = 0
-
     # Find all distinct MAC addresses for which the is_inspected field is 1
     with model.db:
         q = model.Device.select(model.Device.mac_addr) \
@@ -83,7 +81,6 @@ def add_product_info_to_devices():
     inferred_product_name_dict = dict()
     for mac_addr in mac_addr_list:
         friendly_names = []
-        # product_name = get_product_name_from_backend(mac_addr.upper())
         product_name = None
         # Check if we already have the device name
         if mac_addr in mac_name_list and mac_name_list[mac_addr]['name'] != "":
@@ -101,7 +98,7 @@ def add_product_info_to_devices():
             if datetime.datetime.now() - rec['updated_at'] > datetime.timedelta(minutes=update_delay):
                 # print(f"\nRequesting name: {rec}\n")
                 # Request the product name from the backend
-                product_name = get_product_name_from_backend(mac_addr.upper())
+                product_name = get_product_name_from_backend(mac_addr.upper() , token)
                 if product_name is not None:
                     # We manage to get the device name
                     save_product_name_to_db(product_name, mac_addr)
@@ -168,19 +165,22 @@ def send_notification_email(rec):
         return None
 
 
-def get_product_name_from_backend(macAddress: str) -> str:
-    # Send an HTTP GET request to the Medsec backend server and ask for the device name
+def get_product_name_from_backend(macAddress: str , token: str) -> str:
     url = global_state.BACKEND_URL + f'/device-manager/devices?macAddress={macAddress}'
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
     try:
         return common.http_request_medsec(
             method='get',
             field_to_extract='name',
             args=[url],
-            kwargs=dict(timeout=10)
+            kwargs=dict(headers=headers, timeout=10)
         )
     except IOError:
         return None
-
 
 def save_product_name_to_db(name, device_mac_addr):
     with model.write_lock:

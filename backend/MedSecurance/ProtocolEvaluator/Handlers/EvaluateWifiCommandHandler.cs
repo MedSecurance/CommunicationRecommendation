@@ -7,6 +7,8 @@ using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
+using MedSecurance.Services;
+using MedSecurance.Services.Models;
 
 namespace MedSecurance.ProtocolEvaluator.Handlers;
 
@@ -15,7 +17,8 @@ public class EvaluateWifiCommandHandler(
     IWifiEvaluator wifiEvaluator,
     IRiskAssessmentRepository riskAssessmentRepository,
     IHttpContextAccessor httpContextAccessor,
-    IActivityLogRepository activityLogRepository
+    IActivityLogRepository activityLogRepository,
+    IEvidenceManagerService evidenceManagerService
 ) : IRequestHandler<EvaluateWifiCommand, EvaluateWifiCommandResponse>
 {
     public async Task<EvaluateWifiCommandResponse> Handle(EvaluateWifiCommand request,
@@ -54,12 +57,22 @@ public class EvaluateWifiCommandHandler(
             Action = ActivityLog.Models.Enums.ActivityLogAction.Execute,
             Details = $"{nameof(EvaluateWifiCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
-
-        return new EvaluateWifiCommandResponse(
+        
+        var response = new EvaluateWifiCommandResponse(
             evaluatorResult.Mitigations,
             evaluatorResult.SafeConfigs,
             evaluatorResult.Replacements,
             evaluatorResult.Vulnerabilities
         );
+        
+        var riskAssessmentEvidence = new RiskAssessmentEvidence(
+            riskAssessment.Id, 
+            riskAssessment.Protocol, 
+            riskAssessment.NetworkName,
+            evaluatorResult
+        );
+        await evidenceManagerService.UploadRiskAssessmentEvidence(riskAssessmentEvidence);
+
+        return response;
     }
 }

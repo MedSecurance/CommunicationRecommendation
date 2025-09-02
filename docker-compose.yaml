@@ -35,6 +35,7 @@ services:
       Keycloak__MetadataAddress: ${KEYCLOAK_BACKEND_URL}/realms/MedSec/.well-known/openid-configuration
       Keycloak__Issuer: ${REACT_APP_KEYCLOAK_URL}/realms/MedSec
       Keycloak__TokenUrl: ${KEYCLOAK_BACKEND_URL}/auth/realms/MedSec/protocol/openid-connect/token
+      EvidenceManagerApi__BaseUrl: ${EVIDENCE_MANAGER_API_URL}
     ports:
       - "8080:8080"
 
@@ -58,7 +59,7 @@ services:
     # Uncomment the following line for Linux deployment.
     # network_mode: "host" 
     build:
-      context: ./monitor-matrix
+      context: ./monitor-matrix # replace with "./monitor-matrix-lite" to use the lite version
       dockerfile: Dockerfile
     container_name: medsec-monitor-matrix
     volumes:
@@ -70,9 +71,11 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       UPDATE_DELAY_MINUTES: ${UPDATE_DELAY_MINUTES}
       EMAIL_DELAY_DAYS: ${EMAIL_DELAY_DAYS}
+      KEYCLOAK_URL: ${REACT_APP_KEYCLOAK_URL}
+      KEYCLOAK_TOKEN_URL: ${KEYCLOAK_BACKEND_URL}
     # Comment the following two lines for Linux deployment when using "network_mode: host" above.
     ports:
-      - "33761:33761"      
+      - "33761:33761" # replace with "33762:33762" to use the lite version
 
   ids:
     build:
@@ -101,6 +104,16 @@ services:
     ports:
       - "8081:8080"
 
+#  evidence-manager:
+#    build:
+#      context: ./assurance_tool_integration/code_sample/UoW/centralDB
+#    image: evidence-manager
+#    container_name: evidence-manager
+#    ports:
+#      - "8000:8000"
+#    volumes:
+#      - ./local_data:/app/data
+  
 volumes:
   pgdata:
   user-data:

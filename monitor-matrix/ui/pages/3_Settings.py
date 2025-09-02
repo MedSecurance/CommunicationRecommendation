@@ -7,8 +7,26 @@ import core.model as model
 import core.common as common
 import core.global_state as global_state
 import sidebar
+from core.auth_refresh import refresh_token_loop
+import threading
+import auth
 
+def main():
+    token = auth.ensure_user_logged_in()
 
+    with global_state.token_lock:
+        global_state.token['access_token'] = token['access_token']
+        global_state.token['refresh_token'] = token['refresh_token']
+        global_state.token['expires_at'] = token['expires_at']
+
+    # Start refresh thread only once
+    if 'refresh_thread_started' not in st.session_state:
+        threading.Thread(target=refresh_token_loop, daemon=True).start()
+        st.session_state['refresh_thread_started'] = True
+
+    return
+
+main()
 template.show(
     'Settings'
 )

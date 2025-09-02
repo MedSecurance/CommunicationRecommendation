@@ -1,0 +1,26 @@
+services:
+  # Ideally monitor-matrix should be deployed within the network that you need to monitor 
+  # using docker on Linux based OS. For testing purposes the tool can also be deployed 
+  # locally under Windows and MAC OSes. See comments below for correct configuration.
+  monitor-matrix-lite:
+    # Uncomment the following line for Linux deployment.
+    # network_mode: "host" 
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: medsec-monitor-matrix-lite
+    volumes:
+      - user-data:/app/user-data
+    environment:
+      # The BACKEND_URL should be based on the backend container name if deployed locally, 
+      # otherwise should be the IP address/URL of the backend server
+      BACKEND_URL: "http://medsec-backend:8080" # Current URL is for local deployment only.
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      UPDATE_DELAY_MINUTES: ${UPDATE_DELAY_MINUTES}
+      EMAIL_DELAY_DAYS: ${EMAIL_DELAY_DAYS}
+    # Comment the following two lines for Linux deployment when using "network_mode: host" above.
+    ports:
+      - "33762:33762"      
+  
+volumes:
+  user-data:

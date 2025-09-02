@@ -7,6 +7,8 @@ using MedSecurance.ProtocolEvaluator.Commands;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
+using MedSecurance.Services;
+using MedSecurance.Services.Models;
 
 namespace MedSecurance.ProtocolEvaluator.Handlers;
 
@@ -15,7 +17,8 @@ public class EvaluateBluetoothCommandHandler(
     IBluetoothEvaluator bluetoothEvaluator,
     IRiskAssessmentRepository riskAssessmentRepository,
     IHttpContextAccessor httpContextAccessor,
-    IActivityLogRepository activityLogRepository
+    IActivityLogRepository activityLogRepository,
+    IEvidenceManagerService evidenceManagerService
 ) : IRequestHandler<EvaluateBluetoothCommand, EvaluateCommandResponse>
 {
     public async Task<EvaluateCommandResponse> Handle(EvaluateBluetoothCommand request,
@@ -55,10 +58,20 @@ public class EvaluateBluetoothCommandHandler(
             Details = $"{nameof(EvaluateBluetoothCommand)} RiskAssessment with id {riskAssessment.Id} has been executed"
         });
         
-        return new EvaluateCommandResponse(
+        var response = new EvaluateCommandResponse(
             evaluatorResult.Mitigations,
             evaluatorResult.SafeConfigs,
             evaluatorResult.Replacements
         );
+
+        var riskAssessmentEvidence = new RiskAssessmentEvidence(
+            riskAssessment.Id, 
+            riskAssessment.Protocol, 
+            riskAssessment.NetworkName,
+            evaluatorResult
+        );
+        await evidenceManagerService.UploadRiskAssessmentEvidence(riskAssessmentEvidence);
+        
+        return response;
     }
 }
