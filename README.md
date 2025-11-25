@@ -1,7 +1,7 @@
 # MedSecurance 🚀
 
 This repository contains a comprehensive application designed for evaluating protocols, 
-assessing risks, and managing and monitoring devices in real time.
+assessing risks, and managing and monitoring devices in real time. 
 
 ## Key Features
 - Protocol Evaluation\
