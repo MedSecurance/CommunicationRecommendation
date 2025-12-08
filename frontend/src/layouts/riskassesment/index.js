@@ -13,7 +13,16 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import { stepperJson } from "./data/risk-assesment-stepper-data";
-import { deleteRiskAssessmentById, postWifiAnswersToApi, postBluetoothAnswersToApi, postLoraWanAnswersToApi, postGsmAnswersToApi, getRiskAssessments, getRiskAssessmentById } from "services/protocol-evaluator-service";
+import {
+  deleteRiskAssessmentById,
+  postWifiAnswersToApi,
+  postBluetoothAnswersToApi,
+  postLoraWanAnswersToApi,
+  postGsmAnswersToApi,
+  getRiskAssessments,
+  getRiskAssessmentById,
+  generatePDF, // <-- make sure this is exported in your service
+} from "services/protocol-evaluator-service";
 
 import Wifi from '../riskassesment/protocols/wifi/index.js';
 import Bluetooth from '../riskassesment/protocols/bluetooth/index.js';
@@ -23,19 +32,18 @@ import Gsm from '../riskassesment/protocols/gsm/index.js';
 import mapWifiDataToApiData from '../riskassesment/mappers/wifi-mapper.js';
 import mapBluetoothMapperApiData from '../riskassesment/mappers/bluetooth-mapper.js';
 import loraWanApiData from '../riskassesment/mappers/lora-wan-mapper.js';
-import mapGsmApiData from '../riskassesment/mappers/gsm-mapper.js'
+import mapGsmApiData from '../riskassesment/mappers/gsm-mapper.js';
 
-//Validations
+// Validations
 import bluetoothValidations from '../riskassesment/protocols/bluetooth/bluetooth-validations.js';
-import loraWanValidations from '../riskassesment/protocols/lorawan/lorawan-validations.js'
-import gsmValidations from '../riskassesment/protocols/gsm/gsm-validations.js'
-import wifiValidations from '../riskassesment/protocols/wifi/wifi-validations.js'
-import { useApiRequest } from '../../auth/serviceInterceptor'; // Assuming you have an AuthContext for managing authentication
+import loraWanValidations from '../riskassesment/protocols/lorawan/lorawan-validations.js';
+import gsmValidations from '../riskassesment/protocols/gsm/gsm-validations.js';
+import wifiValidations from '../riskassesment/protocols/wifi/wifi-validations.js';
+import { useApiRequest } from '../../auth/serviceInterceptor';
 import { KeycloakContext } from '../../keycloak-provider';
 import { hasPermission } from '../../authentication-helpers/role-validator';
 
-
-//DataTable
+// DataTable
 import DataTable from "examples/Tables/DataTable";
 import Icon from "@mui/material/Icon";
 
@@ -59,14 +67,30 @@ const RiskAssessment = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [riskAssessmentIdToDelete, setRiskAssessmentIdToDelete] = useState(null);
 
+  const [silentExecute, setSilentExecute] = useState(false);
+
+  // Track which result items are excluded (marked as not wanted)
+  const [excludedResults, setExcludedResults] = useState({
+    mitigations: [],
+    safeConfigs: [],
+    replacements: [],
+    vulnerabilities: [],
+  });
+
   const canDelete = hasPermission(roles, 'RiskAssessment', 'delete');
   const canViewDetails = hasPermission(roles, 'RiskAssessment', 'view');
   const canInsert = hasPermission(roles, 'RiskAssessment', 'insert');
 
-  const sortByWeight = (array) => array.sort((a, b) => b.weight - a.weight);
-  const sortBySeverity = (array) => array.sort((a, b) => b.severity - a.severity);
+  // NON-MUTATING sort helpers
+  const sortByWeight = (array) => {
+    if (!array) return [];
+    return [...array].sort((a, b) => (b.weight || 0) - (a.weight || 0));
+  };
 
-  const [silentExecute, setSilentExecute] = useState(false);
+  const sortBySeverity = (array) => {
+    if (!array) return [];
+    return [...array].sort((a, b) => (b.severity || 0) - (a.severity || 0));
+  };
 
   const weightColors = {
     5: '#ff0000',
@@ -85,7 +109,7 @@ const RiskAssessment = () => {
       if (item.severity === 6) return 2;
       if (item.severity === 5) return 1;
     }
-    return undefined; // fallback
+    return undefined;
   };
 
   const handleCloseSnackbar = () => {
@@ -104,11 +128,28 @@ const RiskAssessment = () => {
       required: true,
     }
   ];
-  const [steps, setSteps] = useState([{ label: "Select Protocol", questions: initialQuestions }, { label: "Results", questions: [] }]);
+
+  const [steps, setSteps] = useState([
+    { label: "Select Protocol", questions: initialQuestions },
+    { label: "Results", questions: [] }
+  ]);
 
   useEffect(() => {
-    setSteps([{ label: "Select Protocol", questions: initialQuestions }, { label: "Results", questions: [] }]);
+    setSteps([
+      { label: "Select Protocol", questions: initialQuestions },
+      { label: "Results", questions: [] }
+    ]);
   }, [answers['protocol']]);
+
+  // Reset exclusion state whenever a new result comes
+  useEffect(() => {
+    setExcludedResults({
+      mitigations: [],
+      safeConfigs: [],
+      replacements: [],
+      vulnerabilities: [],
+    });
+  }, [result]);
 
   // Fetch data from API
   useEffect(() => {
@@ -124,7 +165,6 @@ const RiskAssessment = () => {
   const fetchData = async () => {
     try {
       const response = await getRiskAssessments(apiRequest);
-      // Update rows state with fetched data
       setRows(response.riskAssessments.map(riskAssessment => ({
         networkName: (
           <Typography display="block" variant="caption" fontWeight="medium">
@@ -167,7 +207,7 @@ const RiskAssessment = () => {
     }
   };
 
-  // Render the delete confirmation dialog
+  // Delete confirmation dialog
   const renderDeleteDialog = () => (
     <Dialog
       open={deleteDialogOpen}
@@ -192,18 +232,20 @@ const RiskAssessment = () => {
 
   const handleNext = async () => {
     if (!protocolValue) {
-      setSnackbarMessage("Please select a protocol")
+      setSnackbarMessage("Please select a protocol");
       setSnackbarOpen(true);
       return;
     }
     setErrors({});
-    if (activeStep === steps.length - 2) {
 
+    if (activeStep === steps.length - 2) {
       setLoading(true);
+
       if (protocolData.protocol === 'wifi') {
         const newErrors = wifiValidations(protocolData);
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
+          setLoading(false);
           return;
         }
 
@@ -212,30 +254,30 @@ const RiskAssessment = () => {
         setResult(response);
         await fetchData();
       } else if (protocolData.protocol === 'bluetooth') {
-
         const newErrors = bluetoothValidations(protocolData);
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
+          setLoading(false);
           return;
         }
         const mappedData = mapBluetoothMapperApiData(protocolData);
         const response = await postBluetoothAnswersToApi(mappedData, getAuthHeaders);
         setResult(response);
       } else if (protocolData.protocol === 'lorawan') {
-
         const newErrors = loraWanValidations(protocolData);
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
+          setLoading(false);
           return;
         }
         const mappedData = loraWanApiData(protocolData);
         const response = await postLoraWanAnswersToApi(mappedData, getAuthHeaders);
         setResult(response);
-      }
-      else if (protocolData.protocol === 'Gsm') {
+      } else if (protocolData.protocol === 'Gsm') {
         const newErrors = gsmValidations(protocolData);
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
+          setLoading(false);
           return;
         }
         const mappedData = mapGsmApiData(protocolData);
@@ -245,7 +287,6 @@ const RiskAssessment = () => {
 
       setLoading(false);
       setActiveStep((prev) => prev + 1);
-
     } else {
       setActiveStep((prev) => prev + 1);
     }
@@ -266,13 +307,13 @@ const RiskAssessment = () => {
   const confirmDelete = async () => {
     if (riskAssessmentIdToDelete) {
       await deleteRiskAssessmentById(riskAssessmentIdToDelete, apiRequest);
-      await fetchData(); // Refresh data after deletion
-      closeDeleteDialog(); // Close the dialog after deletion
+      await fetchData();
+      closeDeleteDialog();
     }
   };
 
-  const getProtocolData = (protocolData) => {
-    setProtocolData(protocolData);
+  const getProtocolData = (data) => {
+    setProtocolData(data);
   };
 
   const handleBack = () => {
@@ -280,12 +321,11 @@ const RiskAssessment = () => {
   };
 
   const HandleDownloadResultsAndAnswers = () => {
-
     if (result) {
-      protocolData.results = result
+      protocolData.results = result;
     }
 
-    const jsonData = JSON.stringify(protocolData)
+    const jsonData = JSON.stringify(protocolData);
     const blob = new Blob([jsonData], { type: 'application/json' });
 
     const url = URL.createObjectURL(blob);
@@ -296,28 +336,133 @@ const RiskAssessment = () => {
     document.body.appendChild(link);
     link.click();
 
-
     link.parentNode.removeChild(link);
-
+    URL.revokeObjectURL(url);
   };
 
-  // Use a ref to reference the hidden file input element
+  // Helper to get the exact arrays used in UI (sorted)
+  const getSectionData = (res) => {
+    if (!res) {
+      return {
+        mitigations: [],
+        safeConfigs: [],
+        replacements: [],
+        vulnerabilities: [],
+      };
+    }
+
+    return {
+      mitigations: res.mitigations ? sortByWeight(res.mitigations) : [],
+      safeConfigs: res.safeConfigs ? sortByWeight(res.safeConfigs) : [],
+      replacements: res.replacements?.suggestions
+        ? sortByWeight(res.replacements.suggestions)
+        : [],
+      vulnerabilities: res.vulnerabilities ? sortBySeverity(res.vulnerabilities) : [],
+    };
+  };
+
+  // Get only the not-excluded results, using the same sorted arrays as the UI
+  const getFilteredResult = () => {
+    if (!result) return null;
+
+    const sectionData = getSectionData(result);
+
+    const filtered = { ...result };
+
+    // These will now match the indexes the user saw in the UI
+    filtered.mitigations = sectionData.mitigations.filter(
+      (_, idx) => !excludedResults.mitigations?.includes(idx)
+    );
+
+    filtered.safeConfigs = sectionData.safeConfigs.filter(
+      (_, idx) => !excludedResults.safeConfigs?.includes(idx)
+    );
+
+    if (result.replacements) {
+      filtered.replacements = {
+        ...result.replacements,
+        suggestions: sectionData.replacements.filter(
+          (_, idx) => !excludedResults.replacements?.includes(idx)
+        ),
+      };
+    }
+
+    filtered.vulnerabilities = sectionData.vulnerabilities.filter(
+      (_, idx) => !excludedResults.vulnerabilities?.includes(idx)
+    );
+
+    return filtered;
+  };
+
+  const hasWantedResults = () => {
+    const filtered = getFilteredResult();
+    if (!filtered) return false;
+
+    const count =
+      (filtered.mitigations?.length || 0) +
+      (filtered.safeConfigs?.length || 0) +
+      (filtered.replacements?.suggestions?.length || 0) +
+      (filtered.vulnerabilities?.length || 0);
+
+    return count > 0;
+  };
+
+  // Toggle exclude/include for a specific item
+  const toggleExclude = (sectionKey, index) => {
+    setExcludedResults((prev) => {
+      const current = prev[sectionKey] || [];
+      const isExcluded = current.includes(index);
+      const updated = isExcluded
+        ? current.filter((i) => i !== index)
+        : [...current, index];
+
+      return { ...prev, [sectionKey]: updated };
+    });
+  };
+
+  // Generate and download PDF from not-excluded results
+  const handleDownloadPdf = async () => {
+    try {
+      const filteredResult = getFilteredResult();
+      debugger;
+
+      if (!filteredResult || !hasWantedResults()) {
+        setSnackbarMessage("No results selected for PDF");
+        setSnackbarOpen(true);
+        return;
+      }
+
+      const pdfBlob = await generatePDF(filteredResult, getAuthHeaders);
+      debugger;
+
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "risk-assessment-report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setSnackbarMessage("Failed to generate PDF");
+      setSnackbarOpen(true);
+    }
+  };
+
+  // File upload handling
   const fileInputRef = useRef(null);
 
-  // Function to handle the button click and trigger file input click
   const handleUpload = () => {
     fileInputRef.current.click();
   };
 
-  // Function to handle file input change
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
 
-      // Read the file as text
       reader.readAsText(file);
-      // On load, parse the JSON and save to state
       reader.onload = () => {
         try {
           const parsedData = JSON.parse(reader.result);
@@ -330,7 +475,6 @@ const RiskAssessment = () => {
         }
       };
 
-      // Handle errors reading the file
       reader.onerror = () => {
         console.error('Error reading file:', reader.error);
       };
@@ -340,13 +484,13 @@ const RiskAssessment = () => {
   const renderProtocolChoice = () => {
     switch (protocolValue) {
       case 'wifi':
-        return (<Wifi getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />)
+        return (<Wifi getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />);
       case 'bluetooth':
-        return (<Bluetooth getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />)
+        return (<Bluetooth getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />);
       case 'gsm':
-        return (<Gsm getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />)
+        return (<Gsm getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />);
       case 'lorawan':
-        return (<LoraWAN getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />)
+        return (<LoraWAN getProtocolData={getProtocolData} protocolData={protocolData} errors={errors} />);
       default:
         return ('');
     }
@@ -355,7 +499,7 @@ const RiskAssessment = () => {
   const handleProtocolInputChange = (e) => {
     setErrors({});
     setProtocolData({});
-    const { name, value } = e.target;
+    const { value } = e.target;
     setProtocolValue(value);
   };
 
@@ -366,155 +510,229 @@ const RiskAssessment = () => {
     setResult({});
     setProtocolValue('');
     setShowRiskAssesment(false);
+    setExcludedResults({
+      mitigations: [],
+      safeConfigs: [],
+      replacements: [],
+      vulnerabilities: [],
+    });
   };
 
   const renderStepper = () => {
-    return (<MDBox mt={6} mb={3}>
-      <Grid container spacing={3} justifyContent="center">
-        <Grid item xs={12} lg={8}>
-          <Card>
-            <MDBox p={2} display="flex" justifyContent="space-between" alignItems="center">
-              <MDTypography variant="h5">Risk Assessment</MDTypography>
-              {/* Close button */}
-              <IconButton onClick={handleClose} aria-label="close">
-                <CloseIcon />
-              </IconButton>
-            </MDBox>
-            <Box sx={{ width: '100%' }}>
-              <Stepper activeStep={activeStep} alternativeLabel>
-                {steps.map((step, index) => (
-                  <Step key={index}>
-                    <StepLabel>{step.label}</StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
-              <MDBox p={2}>
-                {activeStep === steps.length ? (
-                  <MDTypography>All steps completed - you're finished</MDTypography>
-                ) : (
-                  <>
-                    {activeStep === steps.length - 1 ? (
-                      loading ? (
-                        <Box sx={{ textAlign: 'center', p: 4 }}>
-                          <CircularProgress />
-                        </Box>
-                      ) : (
-                        <Box>
-                          <Typography variant="h4" align="center" sx={{ mb: 2 }}>
-                            Results
-                          </Typography>
+    const sectionData = getSectionData(result);
 
-                          {[{ title: "Mitigations", data: sortByWeight(result.mitigations) },
-                          { title: "Safe Configurations", data: sortByWeight(result.safeConfigs) },
-                          { title: "Protocol Replacements", data: result.replacements.suggestions ? sortByWeight(result.replacements.suggestions) : [] },
-                          { title: "Vulnerabilities", data: result.vulnerabilities ? sortBySeverity(result.vulnerabilities) : [] }
-                          ].map((section, index) => (
-                            <Accordion key={index} defaultExpanded>
-                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Typography variant="h5">{section.title}</Typography>
-                              </AccordionSummary>
-                              <AccordionDetails>
-                                {section.data.length > 0 ? (
-                                  section.data.map((item, idx) => (
-                                    <MDTypography
-                                      variant="h6"
-                                      key={idx}
-                                      style={{ color: weightColors[getWeight(item)] || '#000', marginBottom: '8px' }}
-                                    >
-                                      <strong> ({item.weight || item.severity}) </strong>
-                                      {item.host ? " Host :" + item.host + " - " : " "}
-                                      {item.message || item.text}
-                                    </MDTypography>
-
-                                  ))
-                                ) : (
-                                  <Typography variant="body2" color="textSecondary">
-                                    No {section.title.toLowerCase()} available.
-                                  </Typography>
-                                )}
-                              </AccordionDetails>
-                            </Accordion>
-                          ))}
-
-                          {canInsert && (
-                            <Box sx={{ display: "flex", flexDirection: "row", pt: 2, justifyContent: "space-between" }}>
-                              <Button color="inherit" onClick={handleBack} sx={{ mr: 1 }}>
-                                Back
-                              </Button>
-                              <Box sx={{ flex: "1 1 auto" }} />
-                              <Button color="inherit" onClick={HandleDownloadResultsAndAnswers} sx={{ mr: 1 }}>
-                                Download Answers
-                              </Button>
-                            </Box>
-                          )}
-
-
-                        </Box>
-                      )
-                    ) : (
-                      <>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth margin="normal">
-                              <InputLabel>{'Protocol'}</InputLabel>
-                              <Select
-                                label={'Protocol'}
-                                id='15'
-                                value={protocolValue}
-                                onChange={(e) => handleProtocolInputChange(e)}
-                              >
-                                <MenuItem key={'wifi'} value={'wifi'}>{'WiFi'}</MenuItem>
-                                <MenuItem key={'bluetooth'} value={'bluetooth'}>{'Bluetooth'}</MenuItem>
-                                <MenuItem key={'gsm'} value={'gsm'}>{'Gsm'}</MenuItem>
-                                <MenuItem key={'lorawan'} value={'lorawan'}>{'LoRaWAN'}</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Grid>
-                        </Grid>
-                        {renderProtocolChoice()}
-                        <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
-                          <Button
-                            color="inherit"
-                            disabled={activeStep === 0}
-                            onClick={handleBack}
-                            sx={{ mr: 1 }}
-                          >
-                            Back
-                          </Button>
-                          <Box sx={{ flex: '1 1 auto' }} />
-                          <Button onClick={handleNext}>
-                            {activeStep === steps.length - 2 ? 'Finish' : 'Next'}
-                          </Button>
-                        </Box>
-                      </>
-                    )}
-                  </>
-                )}
+    return (
+      <MDBox mt={6} mb={3}>
+        <Grid container spacing={3} justifyContent="center">
+          <Grid item xs={12} lg={8}>
+            <Card>
+              <MDBox p={2} display="flex" justifyContent="space-between" alignItems="center">
+                <MDTypography variant="h5">Risk Assessment</MDTypography>
+                <IconButton onClick={handleClose} aria-label="close">
+                  <CloseIcon />
+                </IconButton>
               </MDBox>
-            </Box>
-          </Card>
+              <Box sx={{ width: '100%' }}>
+                <Stepper activeStep={activeStep} alternativeLabel>
+                  {steps.map((step, index) => (
+                    <Step key={index}>
+                      <StepLabel>{step.label}</StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+                <MDBox p={2}>
+                  {activeStep === steps.length ? (
+                    <MDTypography>All steps completed - you're finished</MDTypography>
+                  ) : (
+                    <>
+                      {activeStep === steps.length - 1 ? (
+                        loading ? (
+                          <Box sx={{ textAlign: 'center', p: 4 }}>
+                            <CircularProgress />
+                          </Box>
+                        ) : (
+                          <Box>
+                            <Typography variant="h4" align="center" sx={{ mb: 2 }}>
+                              Results
+                            </Typography>
+
+                            {[
+                              {
+                                key: "mitigations",
+                                title: "Mitigations",
+                                data: sectionData.mitigations,
+                              },
+                              {
+                                key: "safeConfigs",
+                                title: "Safe Configurations",
+                                data: sectionData.safeConfigs,
+                              },
+                              {
+                                key: "replacements",
+                                title: "Protocol Replacements",
+                                data: sectionData.replacements,
+                              },
+                              {
+                                key: "vulnerabilities",
+                                title: "Vulnerabilities",
+                                data: sectionData.vulnerabilities,
+                              },
+                            ].map((section) => (
+                              <Accordion key={section.key} defaultExpanded>
+                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                  <Typography variant="h5">{section.title}</Typography>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                  {section.data.length > 0 ? (
+                                    section.data.map((item, idx) => {
+                                      const isExcluded =
+                                        excludedResults[section.key]?.includes(idx) || false;
+
+                                      return (
+                                        <Box
+                                          key={`${section.key}-${idx}`}
+                                          display="flex"
+                                          alignItems="center"
+                                          justifyContent="space-between"
+                                          mb={1}
+                                        >
+                                          <MDTypography
+                                            variant="h6"
+                                            style={{
+                                              color: weightColors[getWeight(item)] || '#000',
+                                              marginBottom: '8px',
+                                              textDecoration: isExcluded ? 'line-through' : 'none',
+                                              opacity: isExcluded ? 0.6 : 1,
+                                            }}
+                                          >
+                                            <strong> ({item.weight || item.severity}) </strong>
+                                            {item.host ? ` Host :${item.host} - ` : " "}
+                                            {item.message || item.text}
+                                            {isExcluded && (
+                                              <Typography
+                                                variant="caption"
+                                                component="span"
+                                                sx={{ ml: 1, fontStyle: 'italic' }}
+                                              >
+                                                (removed from PDF)
+                                              </Typography>
+                                            )}
+                                          </MDTypography>
+
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => toggleExclude(section.key, idx)}
+                                            aria-label={isExcluded ? "Include again" : "Exclude from PDF"}
+                                          >
+                                            <CloseIcon fontSize="small" />
+                                          </IconButton>
+                                        </Box>
+                                      );
+                                    })
+                                  ) : (
+                                    <Typography variant="body2" color="textSecondary">
+                                      No {section.title.toLowerCase()} available.
+                                    </Typography>
+                                  )}
+                                </AccordionDetails>
+                              </Accordion>
+                            ))}
+
+                            {canInsert && (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "row",
+                                  pt: 2,
+                                  justifyContent: "space-between",
+                                }}
+                              >
+                                <Button color="inherit" onClick={handleBack} sx={{ mr: 1 }}>
+                                  Back
+                                </Button>
+                                <Box sx={{ flex: "1 1 auto" }} />
+                                <Button
+                                  color="inherit"
+                                  onClick={HandleDownloadResultsAndAnswers}
+                                  sx={{ mr: 1 }}
+                                >
+                                  Download Answers
+                                </Button>
+                                <Button
+                                  color="inherit"
+                                  onClick={handleDownloadPdf}
+                                  sx={{ mr: 1 }}
+                                  disabled={!hasWantedResults()}
+                                >
+                                  Download PDF
+                                </Button>
+                              </Box>
+                            )}
+                          </Box>
+                        )
+                      ) : (
+                        <>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth margin="normal">
+                                <InputLabel>{'Protocol'}</InputLabel>
+                                <Select
+                                  label={'Protocol'}
+                                  id='15'
+                                  value={protocolValue}
+                                  onChange={handleProtocolInputChange}
+                                >
+                                  <MenuItem key={'wifi'} value={'wifi'}>{'WiFi'}</MenuItem>
+                                  <MenuItem key={'bluetooth'} value={'bluetooth'}>{'Bluetooth'}</MenuItem>
+                                  <MenuItem key={'gsm'} value={'gsm'}>{'Gsm'}</MenuItem>
+                                  <MenuItem key={'lorawan'} value={'lorawan'}>{'LoRaWAN'}</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                          </Grid>
+                          {renderProtocolChoice()}
+                          <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+                            <Button
+                              color="inherit"
+                              disabled={activeStep === 0}
+                              onClick={handleBack}
+                              sx={{ mr: 1 }}
+                            >
+                              Back
+                            </Button>
+                            <Box sx={{ flex: '1 1 auto' }} />
+                            <Button onClick={handleNext}>
+                              {activeStep === steps.length - 2 ? 'Finish' : 'Next'}
+                            </Button>
+                          </Box>
+                        </>
+                      )}
+                    </>
+                  )}
+                </MDBox>
+              </Box>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-    </MDBox>)
-  }
+      </MDBox>
+    );
+  };
 
   const openRiskAssessment = () => {
     setShowRiskAssesment(true);
-  }
+  };
 
-  const HandleShowDetails = async (riskAssessmentId, canInsert) => {
-
+  const HandleShowDetails = async (riskAssessmentId, canInsertPermission) => {
     const data = await getRiskAssessmentById(riskAssessmentId, getAuthHeaders);
-    const protocolDataResponse = JSON.parse(data.riskAssessment.body)
+    const protocolDataResponse = JSON.parse(data.riskAssessment.body);
     protocolDataResponse.riskAssessmentId = data.riskAssessment.id;
     setShowRiskAssesment(true);
-    setProtocolValue(data.riskAssessment.protocol.toLowerCase())
+    setProtocolValue(data.riskAssessment.protocol.toLowerCase());
     setProtocolData(protocolDataResponse);
 
-    if (!canInsert) {
+    if (!canInsertPermission) {
       setSilentExecute(true);
     }
-
   };
 
   const columns = [
@@ -523,71 +741,72 @@ const RiskAssessment = () => {
     { Header: "Created", accessor: "createdAt", align: "left" },
     { Header: "Updated", accessor: "updatedAt", align: "right" },
     { Header: "action", accessor: "action", align: "right" }
-
-  ]
+  ];
 
   const renderTable = () => {
-    return (<MDBox pt={6} pb={3}>
-      <Grid container spacing={6}>
-        <Grid item xs={12}>
-          <Card>
-            <MDBox
-              mx={2}
-              mt={-3}
-              py={3}
-              px={2}
-              variant="gradient"
-              bgColor="info"
-              borderRadius="lg"
-              coloredShadow="info"
-            >
-              <MDBox p={2} display="flex" justifyContent="space-between" alignItems="center">
-                <MDTypography variant="h6" color="white">
-                  Risk Assessment History
-                </MDTypography>              {/* Close button */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                />
-                {/* Button that looks like a button */}
-                <Button
-                  variant="contained"
-                  startIcon={<UploadFileIcon />}
-                  style={{ background: 'white' }}
-                  onClick={handleUpload}
-                >
-                  Upload File
-                </Button>
+    return (
+      <MDBox pt={6} pb={3}>
+        <Grid container spacing={6}>
+          <Grid item xs={12}>
+            <Card>
+              <MDBox
+                mx={2}
+                mt={-3}
+                py={3}
+                px={2}
+                variant="gradient"
+                bgColor="info"
+                borderRadius="lg"
+                coloredShadow="info"
+              >
+                <MDBox p={2} display="flex" justifyContent="space-between" alignItems="center">
+                  <MDTypography variant="h6" color="white">
+                    Risk Assessment History
+                  </MDTypography>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<UploadFileIcon />}
+                    style={{ background: 'white' }}
+                    onClick={handleUpload}
+                  >
+                    Upload File
+                  </Button>
+                </MDBox>
               </MDBox>
-
-            </MDBox>
-            <MDBox pt={3}>
-              <DataTable
-                table={{ columns, rows }}
-                isSorted={true}
-                entriesPerPage={true}
-                showTotalEntries={true}
-                noEndBorder
-              />
-              {canInsert && (
-                <Grid item xs={12} sm={6}>
-                  <Button onClick={() => openRiskAssessment()} variant="outlined" style={{ color: 'black', borderColor: 'black', height: '10px' }} >New Risk Assessment</Button>
-                </Grid>
-              )}
-            </MDBox>
-          </Card>
+              <MDBox pt={3}>
+                <DataTable
+                  table={{ columns, rows }}
+                  isSorted={true}
+                  entriesPerPage={true}
+                  showTotalEntries={true}
+                  noEndBorder
+                />
+                {canInsert && (
+                  <Grid item xs={12} sm={6}>
+                    <Button
+                      onClick={openRiskAssessment}
+                      variant="outlined"
+                      style={{ color: 'black', borderColor: 'black', height: '10px' }}
+                    >
+                      New Risk Assessment
+                    </Button>
+                  </Grid>
+                )}
+              </MDBox>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-    </MDBox>
-    )
-  }
-
-  const colors = ['red', 'purple'];
+      </MDBox>
+    );
+  };
 
   return (
-
     <DashboardLayout>
       <DashboardNavbar />
       {showRiskAssessment ? renderStepper() : renderTable()}
