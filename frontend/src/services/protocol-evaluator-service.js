@@ -167,3 +167,33 @@ export const deleteRiskAssessmentById = async (id, apiRequest) => {
   }
 };
 
+export const generatePDF = async (reportData, getAuthHeaders) => {
+  try {
+    debugger;
+    const authHeaders = await getAuthHeaders();
+
+    const response = await fetch(
+      `${API_BASE_URL}/protocol-evaluator/risk-assessments/report/pdf`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/pdf',
+          ...authHeaders,
+        },
+        body: JSON.stringify(reportData),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    return blob;
+  } catch (error) {
+    console.error('Error posting pdf data:', error);
+    throw error;
+  }
+};
+
