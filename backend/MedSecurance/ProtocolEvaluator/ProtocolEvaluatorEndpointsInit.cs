@@ -6,6 +6,7 @@ using MedSecurance.ProtocolEvaluator.Commands.Gsm;
 using MedSecurance.ProtocolEvaluator.Commands.Lorawan;
 using MedSecurance.ProtocolEvaluator.Commands.RiskAssessment;
 using MedSecurance.ProtocolEvaluator.Models.Enums;
+using MedSecurance.ProtocolEvaluator.PdfReport;
 using MedSecurance.ProtocolEvaluator.Queries;
 using Microsoft.AspNetCore.Mvc;
 
@@ -119,6 +120,21 @@ public static class ProtocolEvaluatorEndpointsInit
             .WithTags("Protocol Evaluator")
             .RequireAuthorization("UserAdmin");
 
+        app
+            .MapPost("protocol-evaluator/risk-assessments/report/pdf",
+                (GeneratePdfReportQuery query) =>
+                {
+                    var pdfBytes = PdfReportGenerator.GenerateReport(query);
+
+                    return Results.File(
+                        pdfBytes,
+                        "application/pdf",
+                        "risk-assessment-report.pdf"
+                    );
+                })
+            .WithName("Export Risk Assessment Results to PDF")
+            .WithTags("Protocol Evaluator")
+            .RequireAuthorization("View");
 
         return app;
     }
