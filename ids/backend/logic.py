@@ -71,6 +71,9 @@ def start_preprocessing(info, input_file):
     subfiles = split_pcap(input_file)
     info.write("Convert splited pcap file to csv files ...")
     errors = covert2csv(subfiles)
+    if errors == -1:
+        info.write("No features generated. Try a different pcap file.")
+        return None
     info.write("Merging csv filed ...")
     output_file = merge_csv_files(input_file)
     info.write(f'Done! ({input_file}), total_errors= ' + str(errors))
@@ -91,6 +94,7 @@ def split_pcap(input_file):
 
 # 2. Converting (sub) .pcap files to .csv files.   
 def covert2csv(subfiles):
+    TEMP_ERROR = False
     # Check available CPU cores
     n_threads = multiprocessing.cpu_count() - 1
     # print(f"{n_threads = }")
@@ -111,11 +115,14 @@ def covert2csv(subfiles):
             processes.append(p)
         for p in processes:
             p.join()
-    assert len(subfiles)==len(os.listdir(destination_directory))
+    if not len(subfiles)==len(os.listdir(destination_directory)):
+        TEMP_ERROR = True
     
     # 3. Removing (sub) .pcap files.
     for sf in subfiles:
         os.remove(split_directory + sf)
+    if TEMP_ERROR:
+        return -1
     return errors
     
 

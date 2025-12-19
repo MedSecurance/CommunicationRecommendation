@@ -58,30 +58,32 @@ with st.form("my-form", clear_on_submit=True):
                 f.write(file.getbuffer())
             info.write("Done!")
             csv_file = logic.start_preprocessing(info, PCAP_SAVED_LOCATION)
+        if csv_file != None:
             info.write("")
             alert = st.success(f"Pcap preprosessing done! Features file available at: {csv_file}")
             time.sleep(3) # Wait for 3 seconds
-            alert.empty() # Clear the alert
+            alert.empty() # Clear the alert              
             
-        with st.spinner("Predicting (using csv file) ..."):
-            df = logic.start_predictions(info, csv_file)    
-            alert = st.success("Predictions process done!")
-            info.write("")
-            time.sleep(3) # Wait for 3 seconds
-            alert.empty() # Clear the alert
-        config = {
-            "src": st.column_config.Column("Source MAC address", width="small", help="The flow source MAC Address", required=True),
-            "dst": st.column_config.Column("Destination MAC address", width="small", help="The flow destination MAC Address", required=True),
-            "isAttack": st.column_config.Column("Attack detected", width="small", help="The prediction for an attack or not", required=True),
-            "attack_prob": st.column_config.Column("Attack Probability", width="small", help="The probability of the Attack or Not", required=True),
-            "details": st.column_config.Column("Attack Type", help="If we have an attack, then what type of attack is", required=True)
-        }
-        st.divider()
-        st.dataframe(df, use_container_width=True, column_config=config) # width=2048)
-        # Send email if an attack is detected
-        if 1 in df['isAttack']:
-            st.html(f"Attacks detected.<br/>Filename: {file.name}<br/>Send email to <a href='mailto: {ADMIN_EMAIL}'> {ADMIN_EMAIL} <a/>")
-            logic.send_notification_email(BACKEND_URL, file.name, ADMIN_EMAIL)
+            with st.spinner("Predicting (using csv file) ..."):
+                df = logic.start_predictions(info, csv_file)    
+                alert = st.success("Predictions process done!")
+                info.write("")
+                time.sleep(3) # Wait for 3 seconds
+                alert.empty() # Clear the alert
+            
+            config = {
+                "src": st.column_config.Column("Source MAC address", width="small", help="The flow source MAC Address", required=True),
+                "dst": st.column_config.Column("Destination MAC address", width="small", help="The flow destination MAC Address", required=True),
+                "isAttack": st.column_config.Column("Attack detected", width="small", help="The prediction for an attack or not", required=True),
+                "attack_prob": st.column_config.Column("Attack Probability", width="small", help="The probability of the Attack or Not", required=True),
+                "details": st.column_config.Column("Attack Type", help="If we have an attack, then what type of attack is", required=True)
+            }
+            st.divider()
+            st.dataframe(df, use_container_width=True, column_config=config) # width=2048)
+            # Send email if an attack is detected
+            if 1 in df['isAttack']:
+                st.html(f"Attacks detected.<br/>Filename: {file.name}<br/>Send email to <a href='mailto: {ADMIN_EMAIL}'> {ADMIN_EMAIL} <a/>")
+                logic.send_notification_email(BACKEND_URL, file.name, ADMIN_EMAIL)
             
     else:
         if submitted:
