@@ -37,11 +37,18 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Fonts\" />
       <Folder Include="Migrations\" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Email\Email.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Fonts\*.ttf"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>
