@@ -18,6 +18,7 @@ using MedSecurance.ProtocolEvaluator;
 using MedSecurance.ProtocolEvaluator.Configuration;
 using MedSecurance.ProtocolEvaluator.Evaluators;
 using MedSecurance.ProtocolEvaluator.Evaluators.Interfaces;
+using MedSecurance.ProtocolEvaluator.PdfReport;
 using MedSecurance.ProtocolEvaluator.Repository;
 using MedSecurance.ProtocolEvaluator.Repository.Interfaces;
 using MedSecurance.Services;
@@ -26,10 +27,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using PdfSharpCore.Fonts;
 using Serilog;
 using Swashbuckle.AspNetCore.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
+
+GlobalFontSettings.FontResolver = new EmbeddedFontResolver();
 
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>();
